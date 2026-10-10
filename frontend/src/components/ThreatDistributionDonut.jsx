@@ -67,11 +67,11 @@ export default function ThreatDistributionDonut({ totalBlocked, refreshTrigger }
             Threat Distribution
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Real CSE-CIC-IDS2018 & Edge Anomaly Surface
+            Local ChromaDB Vector Incident Memory
           </p>
         </div>
-        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#13161f] border border-[#1f2430] text-emerald-400">
-          Live Dataset
+        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#13161f] border border-[#1f2430] text-purple-400">
+          ChromaDB RAG
         </span>
       </div>
 

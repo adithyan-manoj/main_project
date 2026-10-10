@@ -142,7 +142,15 @@ async def process_telemetry(payload: TelemetryPayload):
         logging.error(f"Stage 4 RAG failed: {e}")
         advisory_text = "Error generating advisory. Is Ollama running?"
 
-    # --- RECORD REAL INCIDENT IN THREAT STORE ---
+    # --- RECORD REAL INCIDENT IN LOCAL CHROMA-DB & THREAT STORE ---
+    rag_engine.record_local_incident(
+        classification=threat_class,
+        is_zero_day=simulate_zero_day,
+        src_ip="192.168.1.100",
+        dst_port=feature_dict.get("Dst_Port", 443),
+        protocol=feature_dict.get("Protocol", "TCP"),
+        confidence=confidence
+    )
     threat_store.record_incident(
         classification=threat_class,
         is_zero_day=simulate_zero_day,
@@ -160,6 +168,7 @@ async def process_telemetry(payload: TelemetryPayload):
         "securebert_classification": threat_class,
         "securebert_confidence": confidence,
         "llama3_advisory": advisory_text,
+        "client_node": rag_engine.get_client_node_profile(),
         "message": "All 4 ML Stages Complete! Payload ready for React Dashboard."
     }
 
@@ -182,10 +191,15 @@ async def get_health_report():
     report = rag_engine.generate_health_report(cpu, ram)
     return {"status_report": report}
 
+@app.get("/api/client_node_info")
+async def get_client_node_info():
+    """Returns dynamic system laptop name and edge node specs."""
+    return rag_engine.get_client_node_profile()
+
 @app.get("/api/threat_distribution")
 async def get_threat_distribution():
-    """Returns real threat distribution percentages and counts from CSE-CIC-IDS2018 & live incidents."""
-    return threat_store.get_distribution()
+    """Returns real threat distribution percentages and counts queried from local ChromaDB (client_org_profile)."""
+    return rag_engine.get_org_threat_distribution()
 
 @app.get("/api/temporal_volume")
 async def get_temporal_volume(time_range: str = "24H"):

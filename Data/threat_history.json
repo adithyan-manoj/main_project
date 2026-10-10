@@ -1,5 +1,5 @@
 {
-  "total_blocked": 143,
+  "total_blocked": 144,
   "categories": {
     "dos": {
       "name": "Denial of Service (DoS)",
@@ -22,7 +22,7 @@
     "zero_day": {
       "name": "Zero-Day / Novelty",
       "mitre_id": "T1190",
-      "count": 18,
+      "count": 19,
       "color": "#8b5cf6"
     },
     "web_attack": {
@@ -39,7 +39,7 @@
     "08:00": 120,
     "10:00": 180,
     "12:00": 210,
-    "14:00": 451,
+    "14:00": 452,
     "16:00": 290,
     "18:00": 160,
     "20:00": 95,
@@ -47,6 +47,18 @@
     "24:00": 50
   },
   "recent_events": [
+    {
+      "id": "evt-1791627875084",
+      "status": "anomaly",
+      "statusText": "Blocked",
+      "timestamp": "15:54:35.084",
+      "src": "192.168.1.100:54210",
+      "dst": "192.168.1.1:443",
+      "protocol": "TCP / 443",
+      "confidence": 96,
+      "isVolumetric": true,
+      "category": "T1498: Network Denial of Service"
+    },
     {
       "id": "evt-1791626973665",
       "status": "anomaly",

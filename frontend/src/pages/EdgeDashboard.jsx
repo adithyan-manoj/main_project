@@ -30,6 +30,7 @@ export default function EdgeDashboard() {
   });
 
   // Threat & Telemetry States
+  const [clientNode, setClientNode] = useState(null);
   const [totalBlocked, setTotalBlocked] = useState(142);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isZeroDay, setIsZeroDay] = useState(true);
@@ -43,9 +44,13 @@ export default function EdgeDashboard() {
 
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/system_status`);
-        if (res.ok) {
-          const data = await res.json();
+        const [statusRes, nodeRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/system_status`),
+          fetch(`${API_BASE_URL}/api/client_node_info`)
+        ]);
+
+        if (statusRes.ok) {
+          const data = await statusRes.json();
           if (isMounted) {
             setIsBackendConnected(true);
             setSysStatus(prev => ({
@@ -55,8 +60,11 @@ export default function EdgeDashboard() {
               uptime_hours: data.uptime_hours ?? prev.uptime_hours
             }));
           }
-        } else {
-          if (isMounted) setIsBackendConnected(false);
+        }
+
+        if (nodeRes.ok) {
+          const nodeData = await nodeRes.json();
+          if (isMounted) setClientNode(nodeData);
         }
       } catch {
         if (isMounted) {
@@ -185,6 +193,7 @@ export default function EdgeDashboard() {
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         isBackendConnected={isBackendConnected}
+        clientNode={clientNode}
       />
 
       {/* 2. TOP ROW: System Hardware KPIs (4 Cards) */}

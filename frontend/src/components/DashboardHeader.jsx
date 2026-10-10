@@ -16,11 +16,16 @@ export default function DashboardHeader({
   onOpenRightDrawer, 
   searchQuery, 
   setSearchQuery,
-  isBackendConnected = true 
+  isBackendConnected = true,
+  clientNode
 }) {
+  const nodeTitle = clientNode?.display_name || "Adithyan's MacBook Air";
+  const nodeId = clientNode?.node_id || "Adithyans-MacBook-Air";
+  const nodeSubtitle = `${clientNode?.role || "Autonomous Sentinel"} • ${clientNode?.os || "macOS"}`;
+
   return (
     <header className="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-[#1a1e27]">
-      {/* LEFT: Organization Profile & Quick Drawer Toggles */}
+      {/* LEFT: Organization / Laptop Profile & Quick Drawer Toggles */}
       <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 via-blue-500/10 to-purple-500/20 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.15)] flex-shrink-0">
@@ -29,19 +34,19 @@ export default function DashboardHeader({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-bold text-white tracking-tight">
-                Alpha Banking Corp
+                {nodeTitle}
               </h1>
               <span className="text-gray-600 font-light">|</span>
               <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#12161f] border border-[#1f2533] text-gray-300 font-medium">
-                MAC-EDGE-01
+                {nodeId}
               </span>
             </div>
             <p className="text-[11px] text-gray-500 tracking-wide mt-0.5 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Autonomous Sentinel • US-East Cluster</span>
+              <span>{nodeSubtitle}</span>
               {isBackendConnected && (
                 <span className="text-[10px] text-emerald-400/80 font-mono flex items-center gap-0.5 ml-1">
-                  (API Live)
+                  (ChromaDB Live)
                 </span>
               )}
             </p>
