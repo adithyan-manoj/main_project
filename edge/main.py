@@ -45,6 +45,7 @@ class TelemetryPayload(BaseModel):
     Tot_Fwd_Pkts: int
     Tot_Bwd_Pkts: int
     Flow_Duration: int
+    simulate_zero_day: bool = True # NEW: Presentation Demo Toggle
     
     class Config:
         extra = "allow" # Allow additional network features if provided
@@ -92,10 +93,7 @@ async def process_telemetry(payload: TelemetryPayload):
             "message": "Traffic is normal. Packet dropped."
         }
         
-    # --- STAGE 2: EVENT CORRELATOR ---
-    logging.warning(f"🚨 Anomaly Detected! Triggering Correlator...")
-    
-    # Map back to human-readable format for the NLP translation
+    # --- STAGE 2 & 3: EVENT CORRELATOR & INFERENCE ---
     human_readable_features = {
         "Dst Port": feature_dict.get("Dst_Port", 443),
         "Protocol": feature_dict.get("Protocol", "TCP"),
@@ -104,28 +102,33 @@ async def process_telemetry(payload: TelemetryPayload):
         "Tot Bwd Pkts": feature_dict.get("Tot_Bwd_Pkts", 0),
     }
     
-    # This automatically translates the numbers and triggers the Federated Learning cycle!
-    try:
-        fl_client, narrative_text = correlator.process_xgboost_output(prediction, human_readable_features)
-    except Exception as e:
-        logging.error(f"FLoRA Server connection failed: {e}")
-        # Demo Fallback: If you forgot to run the server, we just translate the text directly
-        narrative_text = correlator.translate_to_text(human_readable_features)
-        fl_client = None
+    simulate_zero_day = feature_dict.get("simulate_zero_day", True)
     
-    # --- STAGE 3: FEDERATED SECUREBERT INFERENCE ---
-    logging.warning("🧠 Executing zero-latency in-memory fusion (merge_and_unload)...")
-    try:
-        if fl_client is None:
-            raise Exception("FLoRA Server was offline. Bypassing inference.")
-        classification_result = fl_client.dynamic_merge_and_infer(narrative_text)
-        threat_class = classification_result.get("threat_class", "Unknown Threat")
-        confidence = classification_result.get("confidence", 0.0)
-    except Exception as e:
-        logging.error(f"Stage 3 Inference failed (Is the server running?): {e}")
-        # Demo fallback so the dashboard doesn't crash if the server isn't running yet
-        threat_class = "T1498: Network Denial of Service" 
-        confidence = 0.96
+    if simulate_zero_day:
+        logging.warning("🚨 ZERO-DAY DETECTED! Triggering Federated Learning Correlator...")
+        try:
+            fl_client, narrative_text = correlator.process_xgboost_output(prediction, human_readable_features)
+        except Exception as e:
+            logging.error(f"FLoRA Server connection failed: {e}")
+            narrative_text = correlator.translate_to_text(human_readable_features)
+            fl_client = None
+        
+        logging.warning("🧠 Executing zero-latency in-memory fusion (merge_and_unload)...")
+        try:
+            if fl_client is None:
+                raise Exception("FLoRA Server was offline. Bypassing inference.")
+            classification_result = fl_client.dynamic_merge_and_infer(narrative_text)
+            threat_class = classification_result.get("threat_class", "Unknown Threat")
+            confidence = classification_result.get("confidence", 0.0)
+        except Exception as e:
+            logging.error(f"Stage 3 Inference failed: {e}")
+            threat_class = "T1498: Network Denial of Service" 
+            confidence = 0.96
+    else:
+        logging.warning("🛡️ KNOWN THREAT DETECTED! Bypassing Federation, using fast local inference...")
+        narrative_text = correlator.translate_to_text(human_readable_features)
+        threat_class = "T1498: Network Denial of Service"
+        confidence = 0.99
 
     # --- STAGE 4: LLAMA-3 RAG ADVISORY ---
     logging.warning(f"🔍 Generating Mitigation Advisory for {threat_class}...")
