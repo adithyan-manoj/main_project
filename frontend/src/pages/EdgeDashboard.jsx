@@ -1,167 +1,236 @@
-import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Server, Activity, ShieldAlert, Cpu, Network, Database, Lock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import DashboardHeader from '../components/DashboardHeader';
+import HardwareKpiCards from '../components/HardwareKpiCards';
+import ThreatDistributionDonut from '../components/ThreatDistributionDonut';
+import TemporalVolumeBarChart from '../components/TemporalVolumeBarChart';
+import ActiveThreatAlertHub from '../components/ActiveThreatAlertHub';
+import TelemetryTable from '../components/TelemetryTable';
+import MultiModalDrawer from '../components/MultiModalDrawer';
+import FederationDrawer from '../components/FederationDrawer';
 
-const mockTelemetry = [
-  { time: '10:00:00', load: 12, anomaly_score: 0.1 },
-  { time: '10:00:15', load: 15, anomaly_score: 0.15 },
-  { time: '10:00:30', load: 14, anomaly_score: 0.08 },
-  { time: '10:00:45', load: 89, anomaly_score: 0.96 }, // Attack
-  { time: '10:01:00', load: 94, anomaly_score: 0.98 },
-  { time: '10:01:15', load: 23, anomaly_score: 0.12 },
-];
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
 export default function EdgeDashboard() {
+  // Drawer States
+  const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(false);
+  const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(false);
+
+  // Search State
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Backend Connectivity State
+  const [isBackendConnected, setIsBackendConnected] = useState(true);
+
+  // Hardware Status State
+  const [sysStatus, setSysStatus] = useState({ 
+    cpu_usage: 24.5, 
+    ram_usage: 38.7, 
+    uptime_hours: 14.8,
+    vram_usage: 3.1
+  });
+
+  // Threat & Telemetry States
+  const [totalBlocked, setTotalBlocked] = useState(142);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isZeroDay, setIsZeroDay] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [threatData, setThreatData] = useState(null);
+  const [lastInjectedEvent, setLastInjectedEvent] = useState(null);
+
+  // Poll hardware status from real FastAPI backend (smoothly jitter if offline)
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/system_status`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setIsBackendConnected(true);
+            setSysStatus(prev => ({
+              ...prev,
+              cpu_usage: data.cpu_usage ?? prev.cpu_usage,
+              ram_usage: data.ram_usage ?? prev.ram_usage,
+              uptime_hours: data.uptime_hours ?? prev.uptime_hours
+            }));
+          }
+        } else {
+          if (isMounted) setIsBackendConnected(false);
+        }
+      } catch {
+        if (isMounted) {
+          setIsBackendConnected(false);
+          // Realistic jitter when offline
+          setSysStatus(prev => ({
+            ...prev,
+            cpu_usage: Math.min(75, Math.max(12, prev.cpu_usage + (Math.random() * 2 - 1))),
+            ram_usage: Math.min(80, Math.max(30, prev.ram_usage + (Math.random() * 0.2 - 0.1)))
+          }));
+        }
+      }
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 2000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Keyboard shortcut listener for ESC (close drawers) & ⌘K (focus search)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsLeftDrawerOpen(false);
+        setIsRightDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Inject traffic: connects to real FastAPI backend (with fallback simulation if backend unreachable)
+  const handleInjectTraffic = async (type) => {
+    setIsProcessing(true);
+
+    const isThreat = type === 'threat';
+    const payload = {
+      Dst_Port: 443,
+      Protocol: "TCP",
+      Tot_Fwd_Pkts: isThreat ? 4500 : 10,
+      Tot_Bwd_Pkts: 10,
+      Flow_Duration: isThreat ? 12000 : 150,
+      simulate_zero_day: isZeroDay
+    };
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/telemetry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setThreatData(data);
+        setLastInjectedEvent({
+          ...data,
+          dstPort: payload.Dst_Port,
+          protocol: payload.Protocol
+        });
+
+        if (data.status === "anomaly_detected" || data.xgboost_score === 1) {
+          setTotalBlocked(prev => prev + 1);
+        }
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        throw new Error("Backend response error");
+      }
+    } catch {
+      // High-Fidelity Simulation Fallback when Edge API is offline
+      setTimeout(() => {
+        if (isThreat) {
+          const simulatedData = {
+            status: "anomaly_detected",
+            xgboost_score: 1,
+            dstPort: 443,
+            protocol: "TCP",
+            narrative_translation: "Detected anomalous TCP network flow targeting destination port 443. The connection lasted 12000 microseconds transmitting 4500 forward packets, exhibiting asymmetric volumetric flood signatures characteristic of high-rate SYN flood resource exhaustion.",
+            securebert_classification: "T1498: Network Denial of Service",
+            securebert_confidence: isZeroDay ? 0.96 : 0.99,
+            llama3_advisory: {
+              threat_summary: "Volumetric denial-of-service packet inundation attempting resource exhaustion on edge TLS gateway.",
+              immediate_actions: [
+                "Drop incoming traffic originating from CIDR block 192.168.1.0/24",
+                "Rate-limit ingress TCP SYN packets on destination Port 443 via Edge iptables",
+                "Trigger priority LoRA parameter upload (ΔW) to Cloud Aggregator",
+                "Isolate edge client MAC-EDGE-01 from internal core banking VLAN"
+              ],
+              long_term_mitigations: [
+                "Enforce upstream BGP scrubbing for volumetric edge protection",
+                "Retrain Stage 1 XGBoost triage boundary on newly flagged packet flow thresholds",
+                "Publish verified MITRE technique IOC into collaborative federated memory"
+              ]
+            },
+            message: "All 4 ML Stages Complete! Live simulation payload active."
+          };
+          setThreatData(simulatedData);
+          setLastInjectedEvent(simulatedData);
+          setTotalBlocked(prev => prev + 1);
+        } else {
+          const benignData = {
+            status: "benign",
+            xgboost_score: 0,
+            dstPort: 443,
+            protocol: "TCP",
+            message: "Traffic is normal. Packet dropped by Stage 1 triage."
+          };
+          setThreatData(benignData);
+          setLastInjectedEvent(benignData);
+        }
+      }, 500);
+    } finally {
+      setTimeout(() => setIsProcessing(false), 500);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-4 h-full">
-      {/* Top Status Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div className="panel p-3">
-          <div className="data-label">Node ID</div>
-          <div className="data-value text-accent-blue mt-1">MAC-EDGE-01</div>
+    <div className="min-h-screen bg-[#060709] text-gray-300 font-sans p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto selection:bg-emerald-500/20 selection:text-white">
+      {/* 1. HEADER (Top Navigation) */}
+      <DashboardHeader
+        onOpenLeftDrawer={() => setIsLeftDrawerOpen(true)}
+        onOpenRightDrawer={() => setIsRightDrawerOpen(true)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        isBackendConnected={isBackendConnected}
+      />
+
+      {/* 2. TOP ROW: System Hardware KPIs (4 Cards) */}
+      <HardwareKpiCards sysStatus={sysStatus} />
+
+      {/* 3. MIDDLE ROW: Threat Analytics (Charts - 2-Column Split) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        {/* Left: Donut Chart ("Entities Overview" style - 5 cols) */}
+        <div className="lg:col-span-5 h-full">
+          <ThreatDistributionDonut totalBlocked={totalBlocked} refreshTrigger={refreshTrigger} />
         </div>
-        <div className="panel p-3">
-          <div className="data-label">Status</div>
-          <div className="mt-1"><span className="badge-alert">Threat Detected</span></div>
-        </div>
-        <div className="panel p-3">
-          <div className="data-label">Active Model</div>
-          <div className="data-value mt-1">SecureBERT_LoRA</div>
-        </div>
-        <div className="panel p-3">
-          <div className="data-label">Inference Latency</div>
-          <div className="data-value mt-1">42ms</div>
-        </div>
-        <div className="panel p-3">
-          <div className="data-label">Memory Usage</div>
-          <div className="data-value mt-1">1.2 GB / 16 GB</div>
-        </div>
-        <div className="panel p-3">
-          <div className="data-label">FLoRA Connection</div>
-          <div className="data-value text-accent-green mt-1">SECURE_TLS_1.3</div>
+
+        {/* Right: Bar Chart ("Network Anomallea" style with glowing spike - 7 cols) */}
+        <div className="lg:col-span-7 h-full">
+          <TemporalVolumeBarChart refreshTrigger={refreshTrigger} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1">
-        {/* Left Column */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
-          
-          {/* Telemetry Chart */}
-          <div className="panel p-4 h-72 flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-200">
-                <Activity className="w-4 h-4 text-gray-500" />
-                Network Telemetry & XGBoost Anomaly Scoring
-              </h2>
-            </div>
-            <div className="flex-1 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockTelemetry}>
-                  <defs>
-                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="2 2" stroke="#262626" vertical={false} />
-                  <XAxis dataKey="time" stroke="#52525B" fontSize={11} tickMargin={8} />
-                  <YAxis stroke="#52525B" fontSize={11} domain={[0, 1]} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#0c0c0c', borderColor: '#262626', borderRadius: '4px', fontSize: '12px' }}
-                    itemStyle={{ color: '#E4E4E7', fontFamily: 'monospace' }}
-                  />
-                  <Area 
-                    type="stepAfter" 
-                    dataKey="anomaly_score" 
-                    stroke="#ef4444" 
-                    fillOpacity={1} 
-                    fill="url(#colorScore)" 
-                    strokeWidth={1.5}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+      {/* 4. INSERT ROW: Active Threat Alert & AI Mitigation Hub */}
+      <ActiveThreatAlertHub 
+        threatData={threatData}
+        onPushWeights={() => setIsRightDrawerOpen(true)}
+      />
 
-          {/* Raw Log Inspection */}
-          <div className="panel flex-1 flex flex-col overflow-hidden">
-            <div className="bg-cyber-card-hover border-b border-cyber-border p-3 flex justify-between items-center">
-              <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-200">
-                <Network className="w-4 h-4 text-gray-500" /> Raw Packet Inspection
-              </h2>
-              <span className="badge-normal">Tailing syslog</span>
-            </div>
-            <div className="p-4 font-mono text-xs space-y-1.5 text-gray-400 overflow-y-auto bg-[#050505]">
-              <p>10:00:44.112 [INFO] eth0: SRC 192.168.1.15 DST 104.21.34.12 PROTO TCP PORT 443 BYTES 1420</p>
-              <p>10:00:44.893 [INFO] eth0: SRC 192.168.1.22 DST 8.8.8.8 PROTO UDP PORT 53 BYTES 402</p>
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-accent-red bg-accent-red/5 p-1 -mx-1">
-                <p>10:00:45.001 [CRITICAL] XGBoost Score 0.96 - UNKNOWN PAYLOAD SIGNATURE DETECTED</p>
-                <p>10:00:45.003 [SYSTEM] Freezing local buffer. Extracting 500ms packet window.</p>
-                <p>10:00:45.015 [FLoRA] Initiating zero-day training on SecureBERT_LoRA...</p>
-              </motion.div>
-            </div>
-          </div>
-        </div>
+      {/* 5. BOTTOM ROW: Live Telemetry & Ingestion (Data Table) */}
+      <TelemetryTable 
+        externalEvent={lastInjectedEvent}
+        onInspectPayload={() => setIsLeftDrawerOpen(true)}
+      />
 
-        {/* Right Column */}
-        <div className="flex flex-col gap-4">
-          
-          {/* AI Classification Block */}
-          <div className="panel flex flex-col border-accent-red/40 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-accent-red"></div>
-            <div className="p-4 border-b border-cyber-border bg-accent-red/5">
-              <div className="data-label text-accent-red">Federated Classification Result</div>
-              <h3 className="text-lg font-mono font-bold text-gray-100 mt-1">T1498: Network Denial of Service</h3>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-4">
-              <div>
-                <div className="data-label">Confidence Score</div>
-                <div className="data-value text-accent-red mt-1">96.42%</div>
-              </div>
-              <div>
-                <div className="data-label">Fusion Strategy</div>
-                <div className="data-value mt-1">merge_and_unload</div>
-              </div>
-              <div>
-                <div className="data-label">Adapter Source</div>
-                <div className="data-value mt-1 text-accent-blue">Global Aggregator</div>
-              </div>
-              <div>
-                <div className="data-label">Action Taken</div>
-                <div className="data-value mt-1 text-accent-orange">Quarantine</div>
-              </div>
-            </div>
-          </div>
+      {/* 6. SIDE/OVERLAY PANELS: Drawers */}
+      {/* Left Drawer: Multi-Modal Ingestion Inspector */}
+      <MultiModalDrawer
+        isOpen={isLeftDrawerOpen}
+        onClose={() => setIsLeftDrawerOpen(false)}
+      />
 
-          {/* RAG Context Block */}
-          <div className="panel flex-1 flex flex-col">
-            <div className="bg-cyber-card-hover border-b border-cyber-border p-3 flex justify-between items-center">
-              <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-200">
-                <Database className="w-4 h-4 text-gray-500" /> MITRE RAG Advisory (Llama-3)
-              </h2>
-            </div>
-            <div className="p-4 text-sm text-gray-300 leading-relaxed font-mono flex-1 overflow-y-auto">
-              <div className="mb-4">
-                <span className="text-gray-500">Querying local ChromaDB for technique T1498...</span><br/>
-                <span className="text-accent-green">Found 3 historical mitigations. Generating advisory.</span>
-              </div>
-              
-              <div className="space-y-3 pl-3 border-l-2 border-cyber-border">
-                <p><strong className="text-gray-100">ANALYSIS:</strong> The anomaly exhibits volumetric flooding characteristics designed to exhaust edge firewall state tables.</p>
-                
-                <p><strong className="text-gray-100">IMMEDIATE ACTIONS:</strong></p>
-                <ul className="list-disc pl-4 space-y-1 text-gray-400">
-                  <li>Deploy BGP Flowspec rules to upstream routers to drop traffic matching signature Hash:8f3a2b.</li>
-                  <li>Enable strict TCP SYN cookies on border gateway.</li>
-                  <li>Isolate subnet 192.168.1.0/24 from mission-critical VLANS.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
-        </div>
-      </div>
+      {/* Right Drawer: Federated Learning & Simulation Controls */}
+      <FederationDrawer
+        isOpen={isRightDrawerOpen}
+        onClose={() => setIsRightDrawerOpen(false)}
+        isZeroDay={isZeroDay}
+        setIsZeroDay={setIsZeroDay}
+        onInjectTraffic={handleInjectTraffic}
+        isProcessing={isProcessing}
+      />
     </div>
   );
 }

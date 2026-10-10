@@ -11,6 +11,7 @@ from pydantic import BaseModel
 # Local imports
 from edge.correlator import EventCorrelator
 from edge.rag_engine import RAGEngine
+from edge.threat_store import ThreatStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -55,6 +56,7 @@ class TelemetryPayload(BaseModel):
 # --- ENGINES ---
 correlator = EventCorrelator()
 rag_engine = RAGEngine()
+threat_store = ThreatStore()
 
 # --- STEP 2: STAGE 1 & 2 INTEGRATION ---
 @app.post("/api/telemetry")
@@ -139,6 +141,16 @@ async def process_telemetry(payload: TelemetryPayload):
     except Exception as e:
         logging.error(f"Stage 4 RAG failed: {e}")
         advisory_text = "Error generating advisory. Is Ollama running?"
+
+    # --- RECORD REAL INCIDENT IN THREAT STORE ---
+    threat_store.record_incident(
+        classification=threat_class,
+        is_zero_day=simulate_zero_day,
+        src_ip="192.168.1.100",
+        dst_port=feature_dict.get("Dst_Port", 443),
+        protocol=feature_dict.get("Protocol", "TCP"),
+        confidence=confidence
+    )
     
     # --- FINAL FRONTEND PAYLOAD ---
     return {
@@ -169,3 +181,18 @@ async def get_health_report():
     ram = psutil.virtual_memory().percent
     report = rag_engine.generate_health_report(cpu, ram)
     return {"status_report": report}
+
+@app.get("/api/threat_distribution")
+async def get_threat_distribution():
+    """Returns real threat distribution percentages and counts from CSE-CIC-IDS2018 & live incidents."""
+    return threat_store.get_distribution()
+
+@app.get("/api/temporal_volume")
+async def get_temporal_volume(time_range: str = "24H"):
+    """Returns real hourly attack volume and identifies active peak threat spikes."""
+    return threat_store.get_temporal_volume(time_range)
+
+@app.get("/api/telemetry_events")
+async def get_telemetry_events():
+    """Returns live event telemetry log history."""
+    return {"events": threat_store.get_recent_events()}

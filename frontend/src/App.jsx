@@ -1,62 +1,40 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import EdgeDashboard from './pages/EdgeDashboard';
 import CloudDashboard from './pages/CloudDashboard';
-import { Activity, Cloud, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Server } from 'lucide-react';
 
-function Navigation() {
-  const location = useLocation();
-  
-  return (
-    <nav className="border-b border-cyber-border bg-cyber-bg px-6 py-3 flex justify-between items-center sticky top-0 z-50">
-      <div className="flex items-center gap-3">
-        <ShieldCheck className="text-accent-blue w-5 h-5" />
-        <h1 className="text-lg font-bold tracking-tight text-gray-100">
-          FEDTHREAT<span className="text-gray-600 font-normal ml-1">ENTERPRISE</span>
-        </h1>
-      </div>
-      
-      <div className="flex gap-2">
-        <Link 
-          to="/" 
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-semibold transition-colors border ${
-            location.pathname === '/' 
-              ? 'bg-cyber-card border-cyber-border text-white' 
-              : 'border-transparent text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          <Activity className="w-3.5 h-3.5" />
-          EDGE NODE
-        </Link>
-        <Link 
-          to="/cloud" 
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-semibold transition-colors border ${
-            location.pathname === '/cloud' 
-              ? 'bg-cyber-card border-cyber-border text-white' 
-              : 'border-transparent text-gray-500 hover:text-gray-300'
-          }`}
-        >
-          <Cloud className="w-3.5 h-3.5" />
-          GLOBAL AGGREGATOR
-        </Link>
-      </div>
-    </nav>
-  );
-}
-
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen flex flex-col bg-cyber-bg">
-        <Navigation />
-        <main className="flex-1 p-4 lg:p-6 overflow-hidden">
+      <div className="min-h-screen bg-[#060709] text-gray-300 flex flex-col selection:bg-emerald-500/20 selection:text-white">
+        <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="/" element={<EdgeDashboard />} />
-            <Route path="/cloud" element={<CloudDashboard />} />
+            <Route 
+              path="/cloud" 
+              element={
+                <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-[#1a1e27]">
+                    <Link 
+                      to="/" 
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0d0f12] border border-[#1a1e27] hover:border-emerald-500/40 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-all shadow-sm"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back to Edge Sentinel</span>
+                    </Link>
+
+                    <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
+                      <Server className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Google Colab Global Aggregator (FLoRA)</span>
+                    </div>
+                  </div>
+                  <CloudDashboard />
+                </div>
+              } 
+            />
           </Routes>
         </main>
       </div>
     </BrowserRouter>
   );
 }
-
-export default App;
