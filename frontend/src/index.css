@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cyber-bg: #000000;
+  --color-cyber-card: #0c0c0c;
+  --color-cyber-card-hover: #141414;
+  --color-cyber-border: #262626;
+  
+  --color-accent-blue: #3b82f6;
+  --color-accent-red: #ef4444;
+  --color-accent-green: #10b981;
+  --color-accent-orange: #f59e0b;
+  
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-cyber-bg text-gray-300 font-sans antialiased selection:bg-accent-blue/30 selection:text-white;
+  }
+}
+
+@layer utilities {
+  .panel {
+    @apply bg-cyber-card border border-cyber-border rounded-md;
+  }
+  
+  .data-label {
+    @apply text-[10px] text-gray-500 uppercase tracking-widest font-semibold;
+  }
+  
+  .data-value {
+    @apply text-sm text-gray-100 font-mono tracking-tight;
+  }
+  
+  .badge-normal {
+    @apply px-2 py-0.5 text-[10px] font-mono border border-accent-green/30 text-accent-green bg-accent-green/10 rounded-sm uppercase;
+  }
+  
+  .badge-alert {
+    @apply px-2 py-0.5 text-[10px] font-mono border border-accent-red/30 text-accent-red bg-accent-red/10 rounded-sm uppercase animate-pulse;
+  }
+}

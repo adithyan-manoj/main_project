@@ -1,0 +1,31 @@
+# Python Virtual Environment
+venv/
+env/
+.env
+__pycache__/
+*.pyc
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.eslintcache
+
+# Massive Machine Learning Files (DO NOT COMMIT)
+# Base models and huge adapters
+Models/**/*.safetensors
+Models/**/*.bin
+Models/**/*.pt
+Models/**/*.pth
+
+# Vector Databases and Raw Datasets
+Data/MITRE_ATTACK/chroma_db/
+Data/MITRE_ATTACK/*.json
+Data/Raw/*.csv
+
+# Flower FL Logs
+*.log

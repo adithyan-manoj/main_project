@@ -1,0 +1,22 @@
+# Frameworks
+fastapi>=0.109.2
+uvicorn>=0.27.1
+flwr>=1.7.0
+
+# Machine Learning
+xgboost>=2.0.3
+scikit-learn>=1.4.0
+pandas>=2.2.0
+numpy>=1.26.4
+
+# Transformer & GenAI (Upgraded to fix PyTorch state_dict security patch)
+torch>=2.8.0
+transformers>=4.57.6
+peft>=0.11.0
+chromadb>=0.4.22
+sentence-transformers>=2.3.1
+
+# Utilities
+python-dotenv>=1.0.1
+pydantic>=2.6.1
+requests>=2.31.0
