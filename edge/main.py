@@ -2,6 +2,8 @@ import os
 import logging
 import pandas as pd
 import xgboost as xgb
+import psutil
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -148,3 +150,22 @@ async def process_telemetry(payload: TelemetryPayload):
         "llama3_advisory": advisory_text,
         "message": "All 4 ML Stages Complete! Payload ready for React Dashboard."
     }
+
+# --- NEW ENDPOINTS: SYSTEM MONITORING ---
+@app.get("/api/system_status")
+async def get_system_status():
+    """Returns live hardware metrics for the React Dashboard."""
+    return {
+        "cpu_usage": psutil.cpu_percent(interval=0.1),
+        "ram_usage": psutil.virtual_memory().percent,
+        "disk_usage": psutil.disk_usage('/').percent,
+        "uptime_hours": round((time.time() - psutil.boot_time()) / 3600, 1)
+    }
+
+@app.get("/api/health_report")
+async def get_health_report():
+    """Uses Llama-3 to generate a live military-style situational report."""
+    cpu = psutil.cpu_percent(interval=0.1)
+    ram = psutil.virtual_memory().percent
+    report = rag_engine.generate_health_report(cpu, ram)
+    return {"status_report": report}

@@ -49,9 +49,9 @@ class RAGEngine:
         logging.info(f"[RAG] Successfully retrieved {len(context_chunks)} historical context chunks.")
         return full_context
 
-    def generate_advisory(self, threat_class: str) -> str:
+    def generate_advisory(self, threat_class: str) -> dict:
         """
-        Uses Llama-3 to generate a Zero-Shot Mitigation Advisory strictly based on MITRE data.
+        Uses Llama-3 to generate a Zero-Shot Mitigation Advisory strictly structured as JSON.
         """
         # 1. Retrieve the Context
         mitre_context = self.retrieve_mitre_context(threat_class)
@@ -59,35 +59,65 @@ class RAGEngine:
         # 2. Strict Zero-Shot Prompt Template
         prompt = f"""You are an elite Cybersecurity Incident Responder. 
 You must analyze the following Threat Class and provide actionable mitigation steps.
-CRITICAL INSTRUCTION: You must ONLY use the provided MITRE ATT&CK context below. Do not hallucinate outside information.
+CRITICAL INSTRUCTION: You must ONLY use the provided MITRE ATT&CK context below. Do not hallucinate.
+CRITICAL INSTRUCTION 2: You MUST return your answer entirely as a raw JSON object. Do NOT wrap it in markdown blocks. Do NOT add conversational text. Return EXACTLY this format:
+{{
+  "threat_summary": "1-sentence executive summary of the attack.",
+  "immediate_actions": ["action 1", "action 2", "action 3"],
+  "long_term_mitigations": ["mitigation 1", "mitigation 2"]
+}}
 
 THREAT CLASS: {threat_class}
 
 MITRE ATT&CK CONTEXT:
 {mitre_context}
-
-Provide a short, extremely concise Incident Response Advisory. Format the output with clear bullet points.
 """
         
-        logging.info("[RAG] Sending constrained prompt to local Llama-3 engine...")
+        logging.info("[RAG] Sending structured JSON prompt to local Llama-3 engine...")
         
         # 3. Call local Ollama API
         payload = {
-            "model": "llama3.1:8b", # The exact model the user downloaded
+            "model": "llama3.1:8b",
             "prompt": prompt,
-            "stream": False
+            "stream": False,
+            "format": "json" # Ollama flag to strictly enforce JSON output
         }
         
         try:
-            # We add a longer timeout since LLM generation takes a few seconds
             response = requests.post(f"{self.ollama_url}/api/generate", json=payload, timeout=120)
             response.raise_for_status()
             
             result_json = response.json()
-            advisory = result_json.get("response", "Error: No response generated.")
-            logging.info("[RAG] Mitigation Advisory generated successfully!")
-            return advisory
+            raw_text = result_json.get("response", "{}")
+            logging.info("[RAG] Structured Mitigation Advisory generated successfully!")
             
-        except requests.exceptions.RequestException as e:
-            logging.error(f"[RAG] Failed to connect to Ollama. Is the server running? Error: {e}")
-            return f"Error: Unable to reach Local Llama-3 Engine. Make sure 'ollama run llama3.1:8b' is running. Details: {str(e)}"
+            return json.loads(raw_text)
+            
+        except Exception as e:
+            logging.error(f"[RAG] Failed to parse Llama-3 output as JSON: {e}")
+            return {
+                "threat_summary": f"Error generating advisory. Is Ollama running? Details: {str(e)}",
+                "immediate_actions": ["Verify Ollama is running (`ollama run llama3.1:8b`)"],
+                "long_term_mitigations": ["Check API connection logs"]
+            }
+
+    def generate_health_report(self, cpu: float, memory: float) -> str:
+        """
+        Generates a 2-sentence military-style health report based on live system metrics.
+        """
+        prompt = f"""You are the system AI for a Zero-Trust Edge Security Node.
+Write a concise, 2-sentence system status report.
+Current CPU Usage: {cpu}%
+Current Memory Usage: {memory}%
+Keep it extremely professional and military-style. Do not use markdown or greetings.
+"""
+        payload = {
+            "model": "llama3.1:8b",
+            "prompt": prompt,
+            "stream": False
+        }
+        try:
+            response = requests.post(f"{self.ollama_url}/api/generate", json=payload, timeout=20)
+            return response.json().get("response", "System operational.")
+        except Exception:
+            return "System Operational. AI Status Report offline."
