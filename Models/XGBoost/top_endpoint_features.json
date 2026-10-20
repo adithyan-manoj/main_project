@@ -1,0 +1,9 @@
+[
+  "process_spawn_rate_5m",
+  "command_entropy_score",
+  "sensitive_dir_write",
+  "parent_child_anomaly",
+  "is_off_hours",
+  "is_privileged_user",
+  "is_suspicious_binary"
+]
