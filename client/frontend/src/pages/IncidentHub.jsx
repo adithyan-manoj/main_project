@@ -1,0 +1,285 @@
+import React, { useState } from 'react';
+import { 
+  ShieldAlert, 
+  Sparkles, 
+  CheckSquare, 
+  Square, 
+  Ban, 
+  Server, 
+  Download, 
+  Zap, 
+  ArrowRight,
+  Database,
+  Terminal,
+  Activity,
+  Layers
+} from 'lucide-react';
+import PillButton from '../components/common/PillButton';
+
+export default function IncidentHub() {
+  const [checkedActions, setCheckedActions] = useState({
+    0: true,
+    1: false,
+    2: false,
+    3: false,
+  });
+
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const toggleCheck = (idx) => {
+    setCheckedActions(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // 6 MITRE Classes from our authentic CTI fine-tuned SecureBERT
+  const mitreTechniques = [
+    { id: 'T1190', name: 'Exploit Public App', tactic: 'Initial Access', active: false },
+    { id: 'T1059', name: 'Command & Scripting', tactic: 'Execution', active: false },
+    { id: 'T1078', name: 'Valid Accounts', tactic: 'Persistence', active: false },
+    { id: 'T1068', name: 'Privilege Escalation', tactic: 'Priv Escalation', active: false },
+    { id: 'T1070', name: 'Indicator Removal', tactic: 'Defense Evasion', active: false },
+    { id: 'T1498', name: 'Network Denial of Service', tactic: 'Impact', active: true, confidence: 96.4 },
+  ];
+
+  const immediateActions = [
+    "Drop incoming traffic originating from anomalous source CIDR block 192.168.1.0/24",
+    "Rate-limit ingress TCP SYN packets on destination Port 443 via macOS pfctl firewall",
+    "Trigger priority LoRA parameter delta upload (ΔW) to Cloud Aggregator",
+    "Isolate host interface from internal local corporate subnet"
+  ];
+
+  const longTermMitigations = [
+    "Enforce upstream BGP scrubbing for volumetric edge protection",
+    "Retrain Stage 1 XGBoost triage boundary on newly flagged packet flow thresholds",
+    "Publish verified MITRE technique IOC into collaborative federated memory"
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed top-6 right-8 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <Zap className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Incident Header Card */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span>CRITICAL INCIDENT</span>
+            </span>
+            <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+              MITRE ATT&CK: T1498
+            </span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+            T1498: Network Denial of Service Flood
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Target Asset: <span className="font-semibold text-gray-700">Adithyan's MacBook Air (Port 443 / TLS)</span> • Protocol: <span className="font-mono text-gray-700">TCP</span>
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4 text-right">
+          <div>
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
+              SecureBERT Match
+            </span>
+            <span className="text-3xl font-black text-gray-950 font-sans">
+              96.4%
+            </span>
+            <span className="text-[11px] font-bold text-rose-600 block">High Confidence</span>
+          </div>
+          <div className="px-3 py-2 rounded-2xl bg-rose-50 border border-rose-200/70 text-rose-700 text-xs font-bold">
+            P1 SEVERITY
+          </div>
+        </div>
+      </div>
+
+      {/* Stage 2 Narrative Translation Box */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Terminal className="w-4 h-4 text-indigo-600" />
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+            Stage 2: Cross-Source Event Correlation Narrative
+          </h3>
+        </div>
+        <div className="bg-gray-50/80 border border-gray-200/70 rounded-2xl p-4 text-xs text-gray-700 leading-relaxed font-sans font-medium">
+          "Detected anomalous TCP network flow targeting destination port 443 on host Adithyan's MacBook Air. The connection lasted 12,000 microseconds transmitting 4,500 forward packets and 10 backward packets, exhibiting irregular volumetric signatures characteristic of a potential high-rate SYN flood resource exhaustion attack."
+        </div>
+      </div>
+
+      {/* 6-Class MITRE ATT&CK Tactical Matrix */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-gray-900 tracking-tight">
+              MITRE ATT&CK 6-Class Intelligence Matrix
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              SecureBERT + LoRA semantic classification on 2,364 authentic CTI reports
+            </p>
+          </div>
+          <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200/60">
+            PEFT LoRA r=8
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {mitreTechniques.map((tech) => (
+            <div
+              key={tech.id}
+              className={`p-3.5 rounded-2xl border transition-all ${
+                tech.active
+                  ? 'bg-rose-50/70 border-rose-300 shadow-xs'
+                  : 'bg-white border-gray-200/70 opacity-75'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-mono font-bold text-gray-500">
+                  {tech.id}
+                </span>
+                {tech.active && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                )}
+              </div>
+              <h4 className={`text-xs font-bold leading-tight ${tech.active ? 'text-rose-900' : 'text-gray-800'}`}>
+                {tech.name}
+              </h4>
+              <p className="text-[10px] text-gray-400 mt-1 font-medium">{tech.tactic}</p>
+              {tech.confidence && (
+                <div className="mt-2 pt-2 border-t border-rose-200/60 text-[11px] font-bold text-rose-700 font-mono">
+                  {tech.confidence}% Conf
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Llama-3 Generative Incident Mitigation Hub */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <h3 className="text-base font-bold text-gray-900 tracking-tight">
+              Llama-3 RAG Automated Incident Playbook
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/60 flex items-center gap-1">
+            <Database className="w-3 h-3 text-emerald-600" />
+            <span>ChromaDB MITRE Context</span>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+          {/* Immediate Actions Checklist */}
+          <div className="bg-gray-50/70 border border-gray-200/70 rounded-2xl p-4">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-xs font-bold text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Immediate Incident Response (SOC Checklist)
+              </h4>
+              <span className="text-[10px] font-mono text-gray-500 font-semibold">
+                {Object.values(checkedActions).filter(Boolean).length}/{immediateActions.length} Done
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {immediateActions.map((action, idx) => {
+                const isChecked = checkedActions[idx] ?? false;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => toggleCheck(idx)}
+                    className={`flex items-start gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all border select-none ${
+                      isChecked
+                        ? 'bg-emerald-50/60 border-emerald-200 text-gray-900'
+                        : 'bg-white border-gray-200/70 text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <span className="mt-0.5 text-emerald-600 flex-shrink-0">
+                      {isChecked ? <CheckSquare className="w-4 h-4 text-emerald-600" /> : <Square className="w-4 h-4 text-gray-400" />}
+                    </span>
+                    <span className={`text-xs leading-snug font-medium ${isChecked ? 'line-through text-gray-400' : ''}`}>
+                      {action}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Long-Term Architecture Hardening */}
+          <div className="bg-gray-50/70 border border-gray-200/70 rounded-2xl p-4 flex flex-col justify-between">
+            <div>
+              <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                <Activity className="w-3.5 h-3.5" />
+                Long-Term Architecture Hardening
+              </h4>
+              <ul className="space-y-2">
+                {longTermMitigations.map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-2.5 text-xs text-gray-700 bg-white border border-gray-200/70 p-2.5 rounded-xl font-medium">
+                    <ArrowRight className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-200 text-[11px] text-gray-500 font-mono flex items-center justify-between">
+              <span>Strategy: FLoRA LoRA</span>
+              <span className="text-purple-600 font-semibold">Differential Privacy ε=0.5</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <PillButton
+              variant="pastel-pink"
+              icon={Ban}
+              onClick={() => showToast("Ingress rule applied: CIDR 192.168.1.0/24 blocked on edge firewall.")}
+            >
+              Block Source IP
+            </PillButton>
+
+            <PillButton
+              variant="outline"
+              icon={Server}
+              onClick={() => showToast("Host isolated from corporate VLAN. Management tunnel active.")}
+            >
+              Quarantine Host
+            </PillButton>
+
+            <PillButton
+              variant="outline"
+              icon={Download}
+              onClick={() => showToast("Compiled and downloaded incident PDF forensic report.")}
+            >
+              Export Incident PDF
+            </PillButton>
+          </div>
+
+          <PillButton
+            variant="pastel-purple"
+            icon={Zap}
+            onClick={() => showToast("Zero-Day LoRA parameters packaged and synced to Flower Server!")}
+          >
+            Push Weights to Colab
+          </PillButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
