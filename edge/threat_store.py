@@ -47,6 +47,12 @@ class ThreatStore:
                     "mitre_id": "T1059",
                     "count": 10,
                     "color": "#10b981"
+                },
+                "cloud_iam": {
+                    "name": "Cloud / IAM Escalation",
+                    "mitre_id": "T1098",
+                    "count": 8,
+                    "color": "#06b6d4"
                 }
             },
             "hourly_timeline": {
@@ -63,7 +69,8 @@ class ThreatStore:
                 "22:00": 70,
                 "24:00": 50
             },
-            "recent_events": []
+            "recent_events": [],
+            "active_campaigns": []
         }
         
         self._load_from_disk()
@@ -85,18 +92,34 @@ class ThreatStore:
         except Exception as e:
             print(f"[ThreatStore] Warning saving history: {e}")
 
-    def record_incident(self, classification: str, is_zero_day: bool = False, src_ip: str = "192.168.1.100", dst_port: int = 443, protocol: str = "TCP", confidence: float = 0.96):
+    def record_incident(
+        self, 
+        classification: str, 
+        is_zero_day: bool = False, 
+        src_ip: str = "192.168.1.100", 
+        dst_port: int = 443, 
+        protocol: str = "TCP", 
+        confidence: float = 0.96,
+        sensor: str = "network",
+        severity: str = "MEDIUM",
+        narrative: str = "",
+        is_campaign: bool = False,
+        attack_chain: list = None
+    ):
         """
         Records a real detected incident, incrementing distribution counts and the current hour's volume.
+        Supports multi-sensor attack campaigns and cross-source temporal metadata.
         """
         with self.lock:
             # 1. Update Category Counts
             cat_key = "zero_day" if is_zero_day else "dos"
-            if "Brute Force" in classification or "T1110" in classification:
+            if "Cloud" in classification or "T1098" in classification or sensor == "cloud":
+                cat_key = "cloud_iam"
+            elif "Brute Force" in classification or "T1110" in classification or sensor == "auth":
                 cat_key = "brute_force"
             elif "Port" in classification or "T1046" in classification:
                 cat_key = "port_scan"
-            elif "Web" in classification or "SQL" in classification:
+            elif "Web" in classification or "SQL" in classification or sensor == "web":
                 cat_key = "web_attack"
 
             if cat_key in self.state["categories"]:
@@ -106,7 +129,6 @@ class ThreatStore:
 
             # 2. Update Current Hour in Temporal Volume
             current_hour = datetime.now().strftime("%H:00")
-            # Map to nearest 2-hour window if using standard 2-hour buckets
             hour_int = datetime.now().hour
             even_hour = (hour_int // 2) * 2
             bucket_key = f"{even_hour:02d}:00"
@@ -121,17 +143,39 @@ class ThreatStore:
                 "status": "anomaly",
                 "statusText": "Blocked",
                 "timestamp": datetime.now().strftime("%H:%M:%S.%f")[:-3],
-                "src": f"{src_ip}:54210",
+                "src": f"{src_ip}:54210" if ":" not in str(src_ip) else src_ip,
                 "dst": f"192.168.1.1:{dst_port}",
-                "protocol": f"{protocol} / {dst_port}",
+                "protocol": f"{protocol.upper()} / {dst_port}",
                 "confidence": int(confidence * 100),
-                "isVolumetric": True,
-                "category": classification
+                "isVolumetric": (sensor == "network"),
+                "category": classification,
+                "sensor": sensor,
+                "severity": severity,
+                "is_campaign": is_campaign
             }
             self.state["recent_events"].insert(0, event_entry)
-            self.state["recent_events"] = self.state["recent_events"][:20]
+            self.state["recent_events"] = self.state["recent_events"][:25]
+
+            # 4. If this is a multi-sensor attack campaign, record the campaign graph
+            if is_campaign:
+                if "active_campaigns" not in self.state:
+                    self.state["active_campaigns"] = []
+                self.state["active_campaigns"].insert(0, {
+                    "id": f"camp-{int(time.time()*1000)}",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "primary_entity": src_ip,
+                    "severity": severity,
+                    "classification": classification,
+                    "narrative": narrative,
+                    "chain": attack_chain or []
+                })
+                self.state["active_campaigns"] = self.state["active_campaigns"][:15]
 
             self._save_to_disk()
+
+    def get_active_campaigns(self):
+        with self.lock:
+            return self.state.get("active_campaigns", [])
 
     def get_distribution(self):
         """
