@@ -1,0 +1,8 @@
+[
+  "api_velocity_5m",
+  "is_access_denied",
+  "is_reconnaissance",
+  "is_privilege_escalation",
+  "is_external_ip",
+  "is_sensitive_source"
+]

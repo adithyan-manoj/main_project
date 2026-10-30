@@ -1,0 +1,304 @@
+{
+  "total_blocked": 147,
+  "categories": {
+    "dos": {
+      "name": "Denial of Service (DoS)",
+      "mitre_id": "T1498",
+      "count": 58,
+      "color": "#ef4444"
+    },
+    "port_scan": {
+      "name": "Port Scanning & Recon",
+      "mitre_id": "T1046",
+      "count": 35,
+      "color": "#f97316"
+    },
+    "brute_force": {
+      "name": "Brute Force / IAM",
+      "mitre_id": "T1110",
+      "count": 23,
+      "color": "#f59e0b"
+    },
+    "zero_day": {
+      "name": "Zero-Day / Novelty",
+      "mitre_id": "T1190",
+      "count": 20,
+      "color": "#8b5cf6"
+    },
+    "web_attack": {
+      "name": "Web / API Injection",
+      "mitre_id": "T1059",
+      "count": 11,
+      "color": "#10b981"
+    }
+  },
+  "hourly_timeline": {
+    "02:00": 45,
+    "04:00": 30,
+    "06:00": 65,
+    "08:00": 120,
+    "10:00": 180,
+    "12:00": 210,
+    "14:00": 452,
+    "16:00": 290,
+    "18:00": 163,
+    "20:00": 95,
+    "22:00": 70,
+    "24:00": 50
+  },
+  "recent_events": [
+    {
+      "id": "evt-1793367202495",
+      "status": "anomaly",
+      "statusText": "Blocked",
+      "timestamp": "19:03:22.495",
+      "src": "185.220.101.5:54210",
+      "dst": "192.168.1.1:443",
+      "protocol": "TCP / 443",
+      "confidence": 98,
+      "isVolumetric": false,
+      "category": "T1190: Exploit Public-Facing Application & Account Takeover",
+      "sensor": "endpoint",
+      "severity": "CRITICAL",
+      "is_campaign": true
+    },
+    {
+      "id": "evt-1793367200165",
+      "status": "anomaly",
+      "statusText": "Blocked",
+      "timestamp": "19:03:20.165",
+      "src": "185.220.101.5:54210",
+      "dst": "192.168.1.1:443",
+      "protocol": "TCP / 443",
+      "confidence": 99,
+      "isVolumetric": false,
+      "category": "T1190: Exploit Public-Facing Application & Account Takeover",
+      "sensor": "auth",
+      "severity": "HIGH",
+      "is_campaign": true
+    },
+    {
+      "id": "evt-1793367197894",
+      "status": "anomaly",
+      "statusText": "Blocked",
+      "timestamp": "19:03:17.894",
+      "src": "185.220.101.5:54210",
+      "dst": "192.168.1.1:443",
+      "protocol": "TCP / 443",
+      "confidence": 99,
+      "isVolumetric": false,
+      "category": "T1190: Exploit Public-Facing Application",
+      "sensor": "web",
+      "severity": "MEDIUM",
+      "is_campaign": false
+    },
+    {
+      "id": "evt-1791627875084",
+      "status": "anomaly",
+      "statusText": "Blocked",
+      "timestamp": "15:54:35.084",
+      "src": "192.168.1.100:54210",
+      "dst": "192.168.1.1:443",
+      "protocol": "TCP / 443",
+      "confidence": 96,
+      "isVolumetric": true,
+      "category": "T1498: Network Denial of Service"
+    },
+    {
+      "id": "evt-1791626973665",
+      "status": "anomaly",
+      "statusText": "Blocked",
+      "timestamp": "15:39:33.665",
+      "src": "192.168.1.100:54210",
+      "dst": "192.168.1.1:443",
+      "protocol": "TCP / 443",
+      "confidence": 96,
+      "isVolumetric": true,
+      "category": "T1498: Network Denial of Service"
+    }
+  ],
+  "active_campaigns": [
+    {
+      "id": "camp-1793367202495",
+      "timestamp": "2026-10-30 19:03:22",
+      "primary_entity": "185.220.101.5",
+      "severity": "CRITICAL",
+      "classification": "T1190: Exploit Public-Facing Application & Account Takeover",
+      "narrative": "Multi-Sensor Attack Campaign detected targeting [ip:185.220.101.5] across 3 modalities within 4s window:\n  (1) [19:03:15 | WEB Sensor | Conf: 99.0%]: Web application exploit attempt via HTTP POST /api/v1/auth/login?user=admin' OR 1=1-- (status: 500) exhibiting SQL injection probe.\n  (2) [19:03:17 | AUTH Sensor | Conf: 99.2%]: Authentication anomaly on SSH for account 'admin_root': 16 failed attempts at velocity 12.0/min with rapid credential brute-forcing.\n  (3) [19:03:20 | ENDPOINT Sensor | Conf: 98.0%]: Suspicious host execution on MAC-EDGE-01: process 'powershell.exe' spawned by 'word.exe' executing anomalous commandline [powershell.exe -enc SQBFAFgA...].\nCorrelation Assessment: Coordinated multi-stage attack path observed [Initial Web Exploit -> IAM Credential Stuffing -> Host Payload Execution].",
+      "chain": [
+        {
+          "timestamp": 1793367195.178852,
+          "sensor": "web",
+          "anomaly_flag": 1,
+          "confidence": 0.99,
+          "phrase": "Web application exploit attempt via HTTP POST /api/v1/auth/login?user=admin' OR 1=1-- (status: 500) exhibiting SQL injection probe",
+          "details": {
+            "sensor": "web",
+            "method": "POST",
+            "uri": "/api/v1/auth/login?user=admin' OR 1=1--",
+            "status_code": 500,
+            "sql_injection_detected": true,
+            "xss_detected": false
+          },
+          "raw_payload": {
+            "Dst_Port": 443,
+            "Protocol": "TCP",
+            "Tot_Fwd_Pkts": 4500,
+            "Tot_Bwd_Pkts": 10,
+            "Flow_Duration": 12000,
+            "simulate_zero_day": true,
+            "modality": "web",
+            "uri_endpoint": "/api/v1/auth/login?user=admin' OR 1=1--",
+            "http_method": "POST",
+            "status_code": 500,
+            "source_ip": "185.220.101.5"
+          },
+          "entity_keys": [
+            "ip:185.220.101.5"
+          ]
+        },
+        {
+          "timestamp": 1793367197.895925,
+          "sensor": "auth",
+          "anomaly_flag": 1,
+          "confidence": 0.9918028712272644,
+          "phrase": "Authentication anomaly on SSH for account 'admin_root': 16 failed attempts at velocity 12.0/min with rapid credential brute-forcing",
+          "details": {
+            "sensor": "auth",
+            "user_id": "admin_root",
+            "source_ip": "185.220.101.5",
+            "service": "SSH",
+            "failed_attempts": 16,
+            "is_privileged": false
+          },
+          "raw_payload": {
+            "Dst_Port": 443,
+            "Protocol": "TCP",
+            "Tot_Fwd_Pkts": 4500,
+            "Tot_Bwd_Pkts": 10,
+            "Flow_Duration": 12000,
+            "simulate_zero_day": true,
+            "modality": "auth",
+            "user_id": "admin_root",
+            "auth_service": "SSH",
+            "failed_attempts_5m": 16,
+            "login_velocity_per_min": 12.0,
+            "source_ip": "185.220.101.5"
+          },
+          "entity_keys": [
+            "ip:185.220.101.5",
+            "user:admin_root"
+          ]
+        },
+        {
+          "timestamp": 1793367200.169311,
+          "sensor": "endpoint",
+          "anomaly_flag": 1,
+          "confidence": 0.98,
+          "phrase": "Suspicious host execution on MAC-EDGE-01: process 'powershell.exe' spawned by 'word.exe' executing anomalous commandline [powershell.exe -enc SQBFAFgA...]",
+          "details": {
+            "sensor": "endpoint",
+            "host_name": "MAC-EDGE-01",
+            "process_name": "powershell.exe",
+            "parent_process": "word.exe",
+            "pid": 1000,
+            "command_line": "powershell.exe -enc SQBFAFgA..."
+          },
+          "raw_payload": {
+            "Dst_Port": 443,
+            "Protocol": "TCP",
+            "Tot_Fwd_Pkts": 4500,
+            "Tot_Bwd_Pkts": 10,
+            "Flow_Duration": 12000,
+            "simulate_zero_day": true,
+            "modality": "endpoint",
+            "host_name": "MAC-EDGE-01",
+            "process_name": "powershell.exe",
+            "parent_process": "word.exe",
+            "command_line": "powershell.exe -enc SQBFAFgA...",
+            "is_unsigned_binary": 1,
+            "source_ip": "185.220.101.5"
+          },
+          "entity_keys": [
+            "ip:185.220.101.5",
+            "host:MAC-EDGE-01"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "camp-1793367200165",
+      "timestamp": "2026-10-30 19:03:20",
+      "primary_entity": "185.220.101.5",
+      "severity": "HIGH",
+      "classification": "T1190: Exploit Public-Facing Application & Account Takeover",
+      "narrative": "Multi-Sensor Attack Campaign detected targeting [ip:185.220.101.5] across 2 modalities within 2s window:\n  (1) [19:03:15 | WEB Sensor | Conf: 99.0%]: Web application exploit attempt via HTTP POST /api/v1/auth/login?user=admin' OR 1=1-- (status: 500) exhibiting SQL injection probe.\n  (2) [19:03:17 | AUTH Sensor | Conf: 99.2%]: Authentication anomaly on SSH for account 'admin_root': 16 failed attempts at velocity 12.0/min with rapid credential brute-forcing.\nCorrelation Assessment: Coordinated multi-stage attack path observed [Initial Web Exploit -> IAM Credential Stuffing].",
+      "chain": [
+        {
+          "timestamp": 1793367195.178852,
+          "sensor": "web",
+          "anomaly_flag": 1,
+          "confidence": 0.99,
+          "phrase": "Web application exploit attempt via HTTP POST /api/v1/auth/login?user=admin' OR 1=1-- (status: 500) exhibiting SQL injection probe",
+          "details": {
+            "sensor": "web",
+            "method": "POST",
+            "uri": "/api/v1/auth/login?user=admin' OR 1=1--",
+            "status_code": 500,
+            "sql_injection_detected": true,
+            "xss_detected": false
+          },
+          "raw_payload": {
+            "Dst_Port": 443,
+            "Protocol": "TCP",
+            "Tot_Fwd_Pkts": 4500,
+            "Tot_Bwd_Pkts": 10,
+            "Flow_Duration": 12000,
+            "simulate_zero_day": true,
+            "modality": "web",
+            "uri_endpoint": "/api/v1/auth/login?user=admin' OR 1=1--",
+            "http_method": "POST",
+            "status_code": 500,
+            "source_ip": "185.220.101.5"
+          },
+          "entity_keys": [
+            "ip:185.220.101.5"
+          ]
+        },
+        {
+          "timestamp": 1793367197.895925,
+          "sensor": "auth",
+          "anomaly_flag": 1,
+          "confidence": 0.9918028712272644,
+          "phrase": "Authentication anomaly on SSH for account 'admin_root': 16 failed attempts at velocity 12.0/min with rapid credential brute-forcing",
+          "details": {
+            "sensor": "auth",
+            "user_id": "admin_root",
+            "source_ip": "185.220.101.5",
+            "service": "SSH",
+            "failed_attempts": 16,
+            "is_privileged": false
+          },
+          "raw_payload": {
+            "Dst_Port": 443,
+            "Protocol": "TCP",
+            "Tot_Fwd_Pkts": 4500,
+            "Tot_Bwd_Pkts": 10,
+            "Flow_Duration": 12000,
+            "simulate_zero_day": true,
+            "modality": "auth",
+            "user_id": "admin_root",
+            "auth_service": "SSH",
+            "failed_attempts_5m": 16,
+            "login_velocity_per_min": 12.0,
+            "source_ip": "185.220.101.5"
+          },
+          "entity_keys": [
+            "ip:185.220.101.5",
+            "user:admin_root"
+          ]
+        }
+      ]
+    }
+  ]
+}
