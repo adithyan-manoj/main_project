@@ -1,0 +1,10 @@
+[
+  "failed_attempts_5m",
+  "login_velocity_per_min",
+  "is_privileged_account",
+  "is_off_hours",
+  "subnet_changes_count",
+  "mfa_prompted",
+  "mfa_failed"
+]
+
