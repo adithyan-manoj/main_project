@@ -15,17 +15,43 @@ frontend/node_modules/
 frontend/dist/
 frontend/.eslintcache
 
-# Massive Machine Learning Files (DO NOT COMMIT)
-# Base models and huge adapters
+# Machine Learning Models, Weights, and Scalers (DO NOT COMMIT)
 Models/**/*.safetensors
 Models/**/*.bin
 Models/**/*.pt
 Models/**/*.pth
+Models/**/*.onnx
+Models/**/*.h5
+Models/**/*.keras
+Models/**/*.tflite
+Models/**/*.pkl
+Models/**/*.pickle
+Models/**/*.joblib
+Models/**/xgboost_*.json
+*.pkl
+*.pickle
+*.joblib
 
-# Vector Databases and Raw Datasets
+# Vector Databases and Raw Datasets (DO NOT COMMIT TRAINING DATA)
 Data/MITRE_ATTACK/chroma_db/
 Data/MITRE_ATTACK/*.json
-Data/Raw/*.csv
+Data/Raw/
+Data/CloudTrail/
+Data/IDS2018/
+Data/**/*.csv
+Data/**/*.parquet
+Data/**/*.feather
+Data/**/*.jsonl
+Data/**/*.sqlite3
+Data/**/*.db
+Data/**/*.zip
+Data/**/*.tar.gz
+Data/**/*.gz
+*.csv
+*.parquet
+*.feather
+*.npy
+*.npz
 
 # Flower FL Logs
 *.log

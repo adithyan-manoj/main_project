@@ -1,0 +1,10 @@
+[
+  "L4_DST_PORT",
+  "PROTOCOL",
+  "OUT_BYTES",
+  "IN_BYTES",
+  "TCP_FLAGS",
+  "OUT_PKTS",
+  "IN_PKTS",
+  "FLOW_DURATION_MILLISECONDS"
+]
