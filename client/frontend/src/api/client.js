@@ -116,6 +116,12 @@ export async function pushWeights() {
   });
 }
 
+export async function resolveIncident() {
+  return await request('/api/remediation/resolve_incident', {
+    method: 'POST'
+  });
+}
+
 export async function exportIncidentReport() {
   return await request('/api/remediation/export_report');
 }

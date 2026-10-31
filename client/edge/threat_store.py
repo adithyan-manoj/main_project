@@ -350,14 +350,18 @@ class ThreatStore:
                 "is_quarantined": self.state.get("is_quarantined", False)
             }
 
+    def resolve_incident(self):
+        """Marks current active incident as resolved and archives it."""
+        with self.lock:
+            self.state["latest_incident"] = None
+            for ev in self.state.get("recent_events", []):
+                if ev.get("status") == "anomaly":
+                    ev["status"] = "resolved"
+                    ev["statusText"] = "Neutralized"
+                    ev["severity"] = "RESOLVED"
+            self._save_to_disk()
+            return True
+
     def get_latest_incident(self):
         with self.lock:
-            latest = self.state.get("latest_incident")
-            if not latest and self.state["recent_events"]:
-                first = self.state["recent_events"][0]
-                latest = {
-                    **first,
-                    "advisory": None,
-                    "narrative": first.get("narrative", f"Detected anomalous telemetry event on {first.get('dst', 'port 443')}.")
-                }
-            return latest
+            return self.state.get("latest_incident")

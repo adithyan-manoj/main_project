@@ -139,17 +139,20 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
 
         if (isMounted && evRes.status === 'fulfilled' && evRes.value?.events) {
           const rawEvents = evRes.value.events;
-          const mappedEvents = rawEvents.slice(0, 10).map((e, idx) => ({
-            id: e.id || `evt-${idx}`,
-            status: e.statusText || (e.status === 'anomaly' ? 'Blocked' : 'Benign'),
-            statusType: e.severity === 'CRITICAL' || e.severity === 'HIGH' || e.isVolumetric ? 'critical' : (e.status === 'anomaly' ? 'warning' : 'normal'),
-            technique: e.category || 'T1498 DoS Flood',
-            source: e.src || '192.168.1.100:54210',
-            dest: e.dst || 'Port 443 / TCP',
-            time: e.timestamp ? e.timestamp.split('.')[0] : '14:32:05',
-            confidence: e.confidence || 96,
-            rawEvent: e
-          }));
+          const mappedEvents = rawEvents.slice(0, 10).map((e, idx) => {
+            const isUnresolvedAnomaly = e.status === 'anomaly' && e.statusText !== 'Neutralized' && e.severity !== 'RESOLVED';
+            return {
+              id: e.id || `evt-${idx}`,
+              status: e.statusText || (e.status === 'anomaly' ? 'Blocked' : 'Benign'),
+              statusType: isUnresolvedAnomaly ? (e.severity === 'CRITICAL' || e.severity === 'HIGH' || e.isVolumetric ? 'critical' : 'warning') : 'normal',
+              technique: e.category || 'T1498 DoS Flood',
+              source: e.src || '192.168.1.100:54210',
+              dest: e.dst || 'Port 443 / TCP',
+              time: e.timestamp ? e.timestamp.split('.')[0] : '14:32:05',
+              confidence: e.confidence || 96,
+              rawEvent: e
+            };
+          });
           setRecentEvents(mappedEvents);
         }
 
@@ -195,9 +198,9 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
     }
   };
 
-  // Real critical count
-  const activeThreatsCount = recentEvents.filter(e => e.statusType === 'critical').length || 1;
-  const totalNeutralized = threatDist.total_blocked || 150;
+  // Real critical count directly from telemetry events
+  const activeThreatsCount = recentEvents.filter(e => e.statusType === 'critical').length;
+  const totalNeutralized = threatDist.total_blocked ?? 0;
 
   return (
     <div className="space-y-6">
@@ -220,8 +223,12 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Active Threats
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
-                Action Required
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                activeThreatsCount > 0 
+                  ? 'bg-rose-50 text-rose-700 border-rose-200/60' 
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+              }`}>
+                {activeThreatsCount > 0 ? 'Action Required' : 'All Clear'}
               </span>
             </div>
 
@@ -229,8 +236,12 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
               <span className="text-5xl font-black text-gray-950 tracking-tight font-sans">
                 {activeThreatsCount}
               </span>
-              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
-                Critical Incident Active
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                activeThreatsCount > 0 
+                  ? 'text-rose-600 bg-rose-50' 
+                  : 'text-emerald-700 bg-emerald-50'
+              }`}>
+                {activeThreatsCount > 0 ? 'Critical Threat Intercepted' : 'System Secure & Protected'}
               </span>
             </div>
           </div>
@@ -241,7 +252,12 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
               <span className="text-xs font-bold text-gray-900 font-mono">{activeThreatsCount} / 7</span>
             </div>
             {/* Discrete block progress indicator */}
-            <DiscreteProgressBar total={7} filled={Math.min(7, activeThreatsCount + 1)} variant="pink" size="md" />
+            <DiscreteProgressBar 
+              total={7} 
+              filled={activeThreatsCount > 0 ? Math.min(7, activeThreatsCount + 1) : 0} 
+              variant={activeThreatsCount > 0 ? "pink" : "green"} 
+              size="md" 
+            />
             <p className="text-[11px] text-gray-500 mt-2 font-medium">
               {totalNeutralized} total threats neutralized across this node
             </p>
@@ -262,7 +278,7 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
 
             <div className="flex items-baseline mt-1">
               <span className="text-5xl font-black text-gray-950 tracking-tight font-sans">
-                1,420
+                {sensorStatus.aggregate_rate || "1,420"}
               </span>
               <span className="text-sm font-semibold text-gray-500 ml-1.5 font-sans">
                 / sec
@@ -277,7 +293,7 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
             </div>
             <DiscreteProgressBar total={7} filled={5} variant="blue" size="md" />
             <p className="text-[11px] text-gray-500 mt-2 font-medium">
-              99.2% benign traffic dropped at Stage 1 triage
+              {sensorStatus.triage_drop_rate || "99.2%"} benign traffic dropped at Stage 1 triage
             </p>
           </div>
         </div>
@@ -470,22 +486,34 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
               {/* Module 1: Critical Incident */}
               <div 
                 onClick={() => onNavigateTab && onNavigateTab('incident-hub')}
-                className="bg-white hover:bg-rose-50/30 border border-gray-200/80 hover:border-rose-200 rounded-2xl p-4 transition-all duration-200 shadow-2xs hover:shadow-xs cursor-pointer group flex flex-col justify-between"
+                className={`bg-white border rounded-2xl p-4 transition-all duration-200 shadow-2xs hover:shadow-xs cursor-pointer group flex flex-col justify-between ${
+                  activeThreatsCount > 0 
+                    ? 'border-gray-200/80 hover:border-rose-200 hover:bg-rose-50/30' 
+                    : 'border-gray-200/80 hover:border-emerald-200 hover:bg-emerald-50/30'
+                }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-full bg-rose-100/90 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <ShieldAlert className="w-5 h-5" />
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform ${
+                    activeThreatsCount > 0 ? 'bg-rose-100/90 text-rose-600' : 'bg-emerald-100/90 text-emerald-600'
+                  }`}>
+                    {activeThreatsCount > 0 ? <ShieldAlert className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200/60">
-                    P1 Critical
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                    activeThreatsCount > 0 
+                      ? 'text-rose-600 bg-rose-50 border-rose-200/60' 
+                      : 'text-emerald-700 bg-emerald-50 border-emerald-200/60'
+                  }`}>
+                    {activeThreatsCount > 0 ? 'Active Alert' : 'Normal'}
                   </span>
                 </div>
                 <div className="mt-3">
-                  <h4 className="text-sm font-bold text-gray-900 group-hover:text-rose-700 transition-colors">
-                    {recentEvents[0]?.technique || 'T1498 Flood'}
+                  <h4 className={`text-sm font-bold transition-colors ${
+                    activeThreatsCount > 0 ? 'text-gray-900 group-hover:text-rose-700' : 'text-gray-900 group-hover:text-emerald-700'
+                  }`}>
+                    {activeThreatsCount > 0 ? (recentEvents[0]?.technique || 'Threat Intercepted') : 'System Secure'}
                   </h4>
                   <p className="text-xs text-gray-500 mt-0.5 font-medium">
-                    Confidence: {recentEvents[0]?.confidence || 96}%
+                    {activeThreatsCount > 0 ? `Confidence: ${recentEvents[0]?.confidence || 96}%` : '0 Active Ingress Anomalies'}
                   </p>
                 </div>
               </div>
@@ -554,7 +582,7 @@ export default function CommandCenter({ onNavigateTab, refreshTrigger = 0 }) {
                     ChromaDB Memory
                   </h4>
                   <p className="text-xs text-gray-500 mt-0.5 font-medium">
-                    Laptop Vector Store
+                    MITRE ATT&CK Memory
                   </p>
                 </div>
               </div>

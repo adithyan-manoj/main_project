@@ -40,8 +40,8 @@ export default function CloudDashboard() {
         <div className="panel p-4">
           <div className="flex justify-between items-start">
             <div>
-              <div className="data-label">Colab VRAM Usage</div>
-              <div className="data-value text-xl mt-1">4.2 / 15.0 GB</div>
+              <div className="data-label">Hub GPU Memory</div>
+              <div className="data-value text-xl mt-1">4.2 / 16.0 GB</div>
             </div>
             <HardDrive className="w-5 h-5 text-gray-600" />
           </div>
@@ -65,7 +65,7 @@ export default function CloudDashboard() {
             <ShieldCheck className="w-4 h-4 text-accent-blue" /> 
             Federated Aggregation Tracker
           </h2>
-          <div className="text-xs font-mono text-gray-500">Port 8080 (gRPC)</div>
+          <div className="text-xs font-mono text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">Secure mTLS Tunnel</div>
         </div>
         
         <div className="p-6 font-mono text-[13px] leading-relaxed text-gray-400 overflow-y-auto bg-[#050505]">

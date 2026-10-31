@@ -24,7 +24,7 @@ export default function App() {
 
                   <div className="flex items-center gap-2 text-xs font-mono text-gray-600">
                     <Server className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Google Colab Global Aggregator (FLoRA)</span>
+                    <span>Cloud Federation Hub (FLoRA Aggregator)</span>
                   </div>
                 </div>
                 <CloudDashboard />

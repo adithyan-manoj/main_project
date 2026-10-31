@@ -21,7 +21,8 @@ import {
   blockIP, 
   quarantineHost, 
   pushWeights, 
-  exportIncidentReport 
+  exportIncidentReport,
+  resolveIncident 
 } from '../api/client';
 
 export default function IncidentHub({ refreshTrigger = 0, onTriggerRefresh }) {
@@ -70,28 +71,52 @@ export default function IncidentHub({ refreshTrigger = 0, onTriggerRefresh }) {
     { id: 'T1498', name: 'Network Denial of Service', tactic: 'Impact' },
   ];
 
-  const activeTechniqueId = incident?.technique_id || 'T1498';
-  const confidence = incident?.confidence || 96.4;
-  const severity = incident?.severity || 'P1 SEVERITY';
-  const targetAsset = incident?.target_asset || "Adithyan's MacBook Air (Port 443 / TLS)";
-  const protocol = incident?.protocol || 'TCP';
-  const narrative = incident?.narrative || "Detected anomalous TCP network flow targeting destination port 443 on host Adithyan's MacBook Air. The connection exhibited asymmetric volumetric flood signatures characteristic of high-rate SYN flood resource exhaustion.";
+  const isThreatActive = Boolean(incident?.has_active_incident) && incident?.severity !== 'NORMAL';
+  const activeTechniqueId = isThreatActive ? (incident?.technique_id || 'T1498') : 'NORMAL';
+  const confidence = isThreatActive ? (incident?.confidence || 96.4) : 100;
+  const severity = isThreatActive ? (incident?.severity || 'P1 SEVERITY') : 'NORMAL';
+  const targetAsset = incident?.target_asset || "Adithyan's MacBook Air (Protected)";
+  const protocol = incident?.protocol || (isThreatActive ? 'TCP' : 'TLS / Encrypted');
+  const narrative = incident?.narrative || (isThreatActive 
+    ? "Anomalous ingress telemetry detected." 
+    : "All 5 edge ingress sensors (Network, Auth, Host Endpoint, Web, Cloud Audit) report normal operational telemetry. Zero active threats or anomalous spikes detected.");
   const advisory = incident?.advisory || {};
 
-  const immediateActions = advisory.immediate_actions || [
+  const immediateActions = advisory.immediate_actions || (isThreatActive ? [
     "Drop incoming traffic originating from source entity CIDR",
     "Rate-limit ingress TCP SYN packets on destination port via edge packet filter",
     "Trigger priority LoRA parameter delta upload (ΔW) to Cloud Aggregator",
-    "Isolate host interface from internal local corporate subnet"
-  ];
+    "Isolate host interface from protected network segment"
+  ] : [
+    "Continue normal background multi-sensor triage across all 5 modalities",
+    "Maintain local parameter isolation and differential privacy guarantees"
+  ]);
 
-  const longTermMitigations = advisory.long_term_mitigations || [
+  const longTermMitigations = advisory.long_term_mitigations || (isThreatActive ? [
     "Enforce upstream scrubbing for volumetric edge protection",
     "Retrain Stage 1 XGBoost triage boundary on newly flagged packet flow thresholds",
     "Publish verified MITRE technique IOC into collaborative federated memory"
-  ];
+  ] : [
+    "Synchronize periodic model checkpoint updates via Cloud Federation Hub",
+    "Monitor ingress velocity trends in Command Center"
+  ]);
 
   // Real button actions
+  const handleResolveIncident = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await resolveIncident();
+      showToast(res.message || "Threat alert resolved. System restored to normal baseline.");
+      if (onTriggerRefresh) onTriggerRefresh();
+      const updated = await fetchLatestIncident();
+      if (updated) setIncident(updated);
+    } catch (err) {
+      showToast(`Failed to resolve incident: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleBlockSource = async () => {
     const rawSrc = incident?.source_entity || '192.168.1.100';
     const cleanIp = rawSrc.split(':')[0];
@@ -166,20 +191,28 @@ export default function IncidentHub({ refreshTrigger = 0, onTriggerRefresh }) {
         </div>
       )}
 
-      {/* Incident Header Card */}
-      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Incident Header Card (Dynamic based on real threat presence) */}
+      <div className={`rounded-3xl p-6 sm:p-7 border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all ${
+        isThreatActive 
+          ? 'bg-white border-rose-200/80 shadow-rose-50/50' 
+          : 'bg-emerald-50/30 border-emerald-200/80 shadow-emerald-50/40'
+      }`}>
         <div>
           <div className="flex items-center gap-2.5 mb-2">
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              <span>{severity}</span>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+              isThreatActive 
+                ? 'bg-rose-50 text-rose-700 border-rose-200/80' 
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isThreatActive ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`} />
+              <span>{isThreatActive ? severity : 'NORMAL • PROTECTED'}</span>
             </span>
             <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-              MITRE ATT&CK: {activeTechniqueId}
+              {isThreatActive ? `MITRE ATT&CK: ${activeTechniqueId}` : 'TRIAGE: 5 SENSORS ACTIVE'}
             </span>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-            {incident?.classification || 'T1498: Network Denial of Service Flood'}
+            {incident?.classification || (isThreatActive ? 'T1498: Denial of Service Ingress' : 'All Clear • No Active Threats Intercepted')}
           </h2>
           <p className="text-xs text-gray-500 mt-1">
             Target Asset: <span className="font-semibold text-gray-700">{targetAsset}</span> • Protocol: <span className="font-mono text-gray-700">{protocol}</span>
@@ -189,16 +222,22 @@ export default function IncidentHub({ refreshTrigger = 0, onTriggerRefresh }) {
         <div className="flex items-center gap-4 text-right">
           <div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">
-              SecureBERT Match
+              {isThreatActive ? 'SecureBERT Match' : 'Sentinel Posture'}
             </span>
             <span className="text-3xl font-black text-gray-950 font-sans">
               {confidence}%
             </span>
-            <span className="text-[11px] font-bold text-rose-600 block">High Confidence</span>
+            <span className={`text-[11px] font-bold block ${isThreatActive ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {isThreatActive ? 'High Threat Confidence' : 'System Secure'}
+            </span>
           </div>
 
-          <div className="px-3 py-2 rounded-2xl bg-rose-50 border border-rose-200/70 text-rose-700 text-xs font-bold">
-            {severity}
+          <div className={`px-3 py-2 rounded-2xl border text-xs font-bold ${
+            isThreatActive 
+              ? 'bg-rose-50 border-rose-200/70 text-rose-700' 
+              : 'bg-emerald-50 border-emerald-200/70 text-emerald-700'
+          }`}>
+            {isThreatActive ? severity : 'ALL CLEAR'}
           </div>
         </div>
       </div>
@@ -347,11 +386,22 @@ export default function IncidentHub({ refreshTrigger = 0, onTriggerRefresh }) {
         {/* Real Action Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
           <div className="flex flex-wrap items-center gap-2.5">
+            {isThreatActive && (
+              <PillButton
+                variant="pastel-green"
+                icon={CheckCircle2}
+                onClick={handleResolveIncident}
+                disabled={isProcessing}
+              >
+                Acknowledge & Resolve Alert
+              </PillButton>
+            )}
+
             <PillButton
               variant="pastel-pink"
               icon={Ban}
               onClick={handleBlockSource}
-              disabled={isProcessing}
+              disabled={isProcessing || !isThreatActive}
             >
               Block Source IP
             </PillButton>
