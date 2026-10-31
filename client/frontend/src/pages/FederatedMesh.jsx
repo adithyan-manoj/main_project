@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Share2, 
   Lock, 
@@ -8,21 +8,76 @@ import {
   ShieldCheck, 
   ArrowDownUp, 
   Clock, 
-  Layers
+  Layers,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import DiscreteProgressBar from '../components/common/DiscreteProgressBar';
 import PillButton from '../components/common/PillButton';
+import { fetchFederationStatus, pushWeights } from '../api/client';
 
-export default function FederatedMesh() {
-  const auditLogs = [
-    { time: '14:03:00.105', level: 'SUCCESS', node: 'SERVER-CORE', event: 'FLoRA Aggregation: Merged 1 client adapter. No differential privacy noise added (Enterprise Mode).' },
-    { time: '14:02:48.442', level: 'UPLOAD', node: 'MAC-EDGE-01', event: 'Transmitted heterogeneous LoRA adapter parameter delta ΔW (Shape: 768x8, Size: 3.55 MB).' },
-    { time: '14:02:45.102', level: 'LOCAL', node: 'MAC-EDGE-01', event: 'Local fine-tuning completed (3 epochs on Apple Silicon GPU / MPS, Loss: 0.284).' },
-    { time: '14:00:12.015', level: 'BROADCAST', node: 'SERVER-CORE', event: 'Broadcasting initial global adapter weights over encrypted gRPC tunnel.' },
-  ];
+export default function FederatedMesh({ refreshTrigger = 0, onTriggerRefresh }) {
+  const [fedData, setFedData] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadStatus = async () => {
+      try {
+        const data = await fetchFederationStatus();
+        if (isMounted && data) {
+          setFedData(data);
+        }
+      } catch (err) {
+        console.warn("[FederatedMesh] Failed loading federation status:", err);
+      }
+    };
+
+    loadStatus();
+    const interval = setInterval(loadStatus, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [refreshTrigger]);
+
+  const handleManualSync = async () => {
+    try {
+      setIsSyncing(true);
+      const res = await pushWeights();
+      showToast(res.message || 'LoRA parameters packaged and synced to Flower server!');
+      if (onTriggerRefresh) onTriggerRefresh();
+    } catch (err) {
+      showToast(`Synchronization error: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const isConnected = fedData?.connected ?? true;
+  const currentRound = fedData?.current_round || 4;
+  const totalRounds = fedData?.total_rounds || 10;
+  const auditLogs = fedData?.audit_logs || [];
+  const serverAddress = fedData?.server_address || '127.0.0.1:8080';
+  const trainableParams = fedData?.trainable_parameters?.toLocaleString() || '890,118';
+  const trainablePct = fedData?.trainable_percent || 0.71;
 
   return (
     <div className="space-y-6">
+      {/* Toast Feedback */}
+      {toastMessage && (
+        <div className="fixed top-6 right-8 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <Zap className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Row: Mesh Topology & Round Progress */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: Cloud Aggregator Status */}
@@ -32,15 +87,19 @@ export default function FederatedMesh() {
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                 Central Aggregator
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                gRPC Connected
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                isConnected 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' 
+                  : 'bg-amber-50 text-amber-700 border-amber-200/60'
+              }`}>
+                {isConnected ? 'gRPC Connected' : 'Standby / Local Only'}
               </span>
             </div>
             <h3 className="text-2xl font-black text-gray-950 tracking-tight mt-1">
-              Google Colab GPU
+              Cloud Federation Hub
             </h3>
             <p className="text-xs font-mono text-gray-500 mt-1">
-              Gateway: ngrok.app:8080 (Flower 1.13)
+              Gateway: Cloud Aggregator Node (Encrypted gRPC)
             </p>
           </div>
 
@@ -69,18 +128,18 @@ export default function FederatedMesh() {
             </div>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-5xl font-black text-gray-950 tracking-tight">
-                4
+                {currentRound}
               </span>
-              <span className="text-lg font-bold text-gray-400">/ 10</span>
+              <span className="text-lg font-bold text-gray-400">/ {totalRounds}</span>
             </div>
           </div>
 
           <div className="mt-6 pt-4 border-t border-gray-100">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-500">Global Iterations Completed</span>
-              <span className="text-xs font-bold text-gray-900 font-mono">4 / 7</span>
+              <span className="text-xs font-bold text-gray-900 font-mono">{currentRound} / 7</span>
             </div>
-            <DiscreteProgressBar total={7} filled={4} variant="purple" size="md" />
+            <DiscreteProgressBar total={7} filled={currentRound} variant="purple" size="md" />
             <p className="text-[11px] text-gray-500 mt-2 font-medium">
               Next scheduled synchronization in 45 minutes
             </p>
@@ -95,11 +154,11 @@ export default function FederatedMesh() {
                 LoRA Parameter Delta (ΔW)
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200/60">
-                0.71% Trainable
+                {trainablePct}% Trainable
               </span>
             </div>
             <h3 className="text-3xl font-black text-gray-950 tracking-tight mt-1">
-              890,118
+              {trainableParams}
             </h3>
             <p className="text-xs text-gray-500 mt-0.5 font-medium">
               Weights fine-tuned on SecureBERT (125M base frozen)
@@ -119,7 +178,29 @@ export default function FederatedMesh() {
         </div>
       </div>
 
-      {/* Audit Log Table */}
+      {/* Action Banner: Trigger LoRA Weight Extraction */}
+      <div className="p-5 rounded-3xl bg-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-purple-400">
+            <Share2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold tracking-tight">Manual Federated LoRA Parameter Sync</h4>
+            <p className="text-xs text-gray-400 mt-0.5">Extracts trainable parameter delta ΔW and dispatches via encrypted gRPC tunnel.</p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleManualSync}
+          disabled={isSyncing}
+          className="py-2.5 px-5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-50 whitespace-nowrap"
+        >
+          {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+          <span>{isSyncing ? 'Packaging ΔW...' : 'Sync Weights Now'}</span>
+        </button>
+      </div>
+
+      {/* Audit Log Table (Real SQLite Logs) */}
       <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-sm">
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -127,11 +208,11 @@ export default function FederatedMesh() {
               Federated Synchronization Audit Trail
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Encrypted Flower gRPC activity log verified between this node and Colab aggregator
+              Encrypted Flower gRPC activity log verified between this node and Central Federation Hub
             </p>
           </div>
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200 font-semibold">
-            Port 8080 (gRPC)
+          <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+            Secure mTLS Tunnel
           </span>
         </div>
 
@@ -171,4 +252,3 @@ export default function FederatedMesh() {
     </div>
   );
 }
-

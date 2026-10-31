@@ -10,11 +10,10 @@ class FedThreatClient(fl.client.NumPyClient):
     def __init__(self, anomaly_data: list):
         self.anomaly_data = anomaly_data
         
-        # Load the frozen SecureBERT model
+        # Load the frozen SecureBERT model (6 authentic CTI MITRE classes)
         model_name = "ehsanaghaei/SecureBERT"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.base_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
-        
+        self.base_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=6)
         # Load the Pre-trained Baseline LoRA Adapter
         import os
         from peft import PeftModel

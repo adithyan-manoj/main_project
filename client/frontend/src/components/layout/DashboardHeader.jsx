@@ -9,6 +9,8 @@ import PillButton from '../common/PillButton';
 export default function DashboardHeader({
   hostTitle = "Adithyan's MacBook Air",
   nodeId = "Adithyans-MacBook-Air",
+  arch = "arm64 • Apple Silicon",
+  isFederated = true,
   activeTab = "command-center",
   onSelectTab,
   onOpenConfig,
@@ -20,6 +22,7 @@ export default function DashboardHeader({
     { id: 'federated-mesh', label: 'Federated Mesh' },
     { id: 'host-health', label: 'Host Health' },
     { id: 'sandbox', label: 'Sandbox' },
+    { id: 'profile', label: 'Profile' },
   ];
 
   return (
@@ -41,7 +44,7 @@ export default function DashboardHeader({
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight mt-1 flex items-center gap-3">
             <span>{hostTitle}</span>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200/60 font-mono">
-              arm64 • Apple Silicon
+              {arch}
             </span>
           </h1>
         </div>
@@ -58,14 +61,26 @@ export default function DashboardHeader({
             Config
           </PillButton>
 
-          {/* ● ONLINE • FEDERATED Status Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-2xs select-none">
+          {/* ● ONLINE • FEDERATED Status Badge (Clickable: opens Federated Mesh view) */}
+          <div 
+            onClick={() => onSelectTab && onSelectTab('federated-mesh')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold tracking-wide border shadow-2xs select-none cursor-pointer transition-all active:scale-95 ${
+              isFederated 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80 hover:bg-emerald-100/70' 
+                : 'bg-amber-50 text-amber-800 border-amber-200/80 hover:bg-amber-100/70'
+            }`}
+            title="Click to view Federated Intelligence & Mesh"
+          >
             <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                isFederated ? 'bg-emerald-400' : 'bg-amber-400'
+              }`} />
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                isFederated ? 'bg-emerald-500' : 'bg-amber-500'
+              }`} />
             </span>
-            <span>ONLINE • FEDERATED</span>
-            <Cpu className="w-3.5 h-3.5 text-emerald-600/80 ml-0.5" />
+            <span>{isFederated ? 'ONLINE • FEDERATED' : 'OFFLINE • STANDBY'}</span>
+            <Cpu className={`w-3.5 h-3.5 ml-0.5 ${isFederated ? 'text-emerald-600/80' : 'text-amber-600/80'}`} />
           </div>
         </div>
       </div>

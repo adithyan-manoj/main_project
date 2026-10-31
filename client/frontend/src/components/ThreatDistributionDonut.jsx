@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ShieldAlert } from 'lucide-react';
+import { fetchThreatDistribution } from '../api/client';
 
 const FALLBACK_THREAT_DATA = [
   { name: 'Denial of Service (DoS)', value: 41, count: 58, color: '#ef4444' },
@@ -37,16 +38,13 @@ export default function ThreatDistributionDonut({ totalBlocked, refreshTrigger }
     let isMounted = true;
     const fetchDistribution = async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/threat_distribution');
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) {
-            if (data.categories && data.categories.length > 0) {
-              setCategories(data.categories);
-            }
-            if (data.total_blocked) {
-              setDisplayTotal(data.total_blocked);
-            }
+        const data = await fetchThreatDistribution();
+        if (isMounted && data) {
+          if (data.categories && data.categories.length > 0) {
+            setCategories(data.categories);
+          }
+          if (data.total_blocked) {
+            setDisplayTotal(data.total_blocked);
           }
         }
       } catch {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity } from 'lucide-react';
+import { fetchTemporalVolume } from '../api/client';
 
 const TIME_RANGES = ['1H', '24H', '7D', '1W', '1M'];
 
@@ -30,17 +31,14 @@ export default function TemporalVolumeBarChart({ refreshTrigger }) {
     let isMounted = true;
     const fetchVolume = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/temporal_volume?time_range=${activeRange}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && data.data && data.data.length > 0) {
-            setTimelineData(data.data);
-            if (data.peak_hour && data.peak_value) {
-              setPeakDetails({ hour: data.peak_hour, value: data.peak_value });
-            }
-            if (data.total_in_period) {
-              setTotalInPeriod(data.total_in_period);
-            }
+        const data = await fetchTemporalVolume(activeRange);
+        if (isMounted && data && data.data && data.data.length > 0) {
+          setTimelineData(data.data);
+          if (data.peak_hour && data.peak_value) {
+            setPeakDetails({ hour: data.peak_hour, value: data.peak_value });
+          }
+          if (data.total_in_period) {
+            setTotalInPeriod(data.total_in_period);
           }
         }
       } catch {

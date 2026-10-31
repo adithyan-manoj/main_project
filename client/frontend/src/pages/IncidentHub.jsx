@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
   Sparkles, 
@@ -12,51 +12,149 @@ import {
   Database,
   Terminal,
   Activity,
-  Layers
+  Layers,
+  CheckCircle2
 } from 'lucide-react';
 import PillButton from '../components/common/PillButton';
+import { 
+  fetchLatestIncident, 
+  blockIP, 
+  quarantineHost, 
+  pushWeights, 
+  exportIncidentReport 
+} from '../api/client';
 
-export default function IncidentHub() {
-  const [checkedActions, setCheckedActions] = useState({
-    0: true,
-    1: false,
-    2: false,
-    3: false,
-  });
-
+export default function IncidentHub({ refreshTrigger = 0, onTriggerRefresh }) {
+  const [incident, setIncident] = useState(null);
+  const [checkedActions, setCheckedActions] = useState({});
   const [toastMessage, setToastMessage] = useState(null);
+  const [isQuarantined, setIsQuarantined] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const toggleCheck = (idx) => {
     setCheckedActions(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+  // Load real active incident from backend
+  useEffect(() => {
+    let isMounted = true;
+    const loadIncident = async () => {
+      try {
+        const data = await fetchLatestIncident();
+        if (isMounted && data) {
+          setIncident(data);
+          if (data.remediation_status) {
+            setIsQuarantined(Boolean(data.remediation_status.is_quarantined));
+          }
+        }
+      } catch (err) {
+        console.warn("[IncidentHub] Failed loading latest incident:", err);
+      }
+    };
 
-  // 6 MITRE Classes from our authentic CTI fine-tuned SecureBERT
+    loadIncident();
+  }, [refreshTrigger]);
+
+  // MITRE 6-Class Tactical Matrix supported by our fine-tuned SecureBERT
   const mitreTechniques = [
-    { id: 'T1190', name: 'Exploit Public App', tactic: 'Initial Access', active: false },
-    { id: 'T1059', name: 'Command & Scripting', tactic: 'Execution', active: false },
-    { id: 'T1078', name: 'Valid Accounts', tactic: 'Persistence', active: false },
-    { id: 'T1068', name: 'Privilege Escalation', tactic: 'Priv Escalation', active: false },
-    { id: 'T1070', name: 'Indicator Removal', tactic: 'Defense Evasion', active: false },
-    { id: 'T1498', name: 'Network Denial of Service', tactic: 'Impact', active: true, confidence: 96.4 },
+    { id: 'T1190', name: 'Exploit Public App', tactic: 'Initial Access' },
+    { id: 'T1059', name: 'Command & Scripting', tactic: 'Execution' },
+    { id: 'T1078', name: 'Valid Accounts', tactic: 'Persistence' },
+    { id: 'T1068', name: 'Privilege Escalation', tactic: 'Priv Escalation' },
+    { id: 'T1070', name: 'Indicator Removal', tactic: 'Defense Evasion' },
+    { id: 'T1498', name: 'Network Denial of Service', tactic: 'Impact' },
   ];
 
-  const immediateActions = [
-    "Drop incoming traffic originating from anomalous source CIDR block 192.168.1.0/24",
-    "Rate-limit ingress TCP SYN packets on destination Port 443 via macOS pfctl firewall",
+  const activeTechniqueId = incident?.technique_id || 'T1498';
+  const confidence = incident?.confidence || 96.4;
+  const severity = incident?.severity || 'P1 SEVERITY';
+  const targetAsset = incident?.target_asset || "Adithyan's MacBook Air (Port 443 / TLS)";
+  const protocol = incident?.protocol || 'TCP';
+  const narrative = incident?.narrative || "Detected anomalous TCP network flow targeting destination port 443 on host Adithyan's MacBook Air. The connection exhibited asymmetric volumetric flood signatures characteristic of high-rate SYN flood resource exhaustion.";
+  const advisory = incident?.advisory || {};
+
+  const immediateActions = advisory.immediate_actions || [
+    "Drop incoming traffic originating from source entity CIDR",
+    "Rate-limit ingress TCP SYN packets on destination port via edge packet filter",
     "Trigger priority LoRA parameter delta upload (ΔW) to Cloud Aggregator",
     "Isolate host interface from internal local corporate subnet"
   ];
 
-  const longTermMitigations = [
-    "Enforce upstream BGP scrubbing for volumetric edge protection",
+  const longTermMitigations = advisory.long_term_mitigations || [
+    "Enforce upstream scrubbing for volumetric edge protection",
     "Retrain Stage 1 XGBoost triage boundary on newly flagged packet flow thresholds",
     "Publish verified MITRE technique IOC into collaborative federated memory"
   ];
+
+  // Real button actions
+  const handleBlockSource = async () => {
+    const rawSrc = incident?.source_entity || '192.168.1.100';
+    const cleanIp = rawSrc.split(':')[0];
+    try {
+      setIsProcessing(true);
+      const res = await blockIP(cleanIp);
+      showToast(res.message || `Firewall rule applied: Blocked ${cleanIp}`);
+      if (onTriggerRefresh) onTriggerRefresh();
+    } catch (err) {
+      showToast(`Failed to block IP: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleQuarantine = async () => {
+    try {
+      setIsProcessing(true);
+      const targetState = !isQuarantined;
+      const res = await quarantineHost(targetState);
+      setIsQuarantined(res.is_quarantined);
+      showToast(res.message || (res.is_quarantined ? 'Host isolated from protected network segment.' : 'Host network connectivity restored.'));
+      if (onTriggerRefresh) onTriggerRefresh();
+    } catch (err) {
+      showToast(`Quarantine action error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExportReport = async () => {
+    try {
+      setIsProcessing(true);
+      const report = await exportIncidentReport();
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FedThreat_Forensic_Report_${report.report_id || Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded incident forensic dossier (${report.report_id})`);
+    } catch (err) {
+      showToast(`Export failed: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePushWeights = async () => {
+    try {
+      setIsProcessing(true);
+      const res = await pushWeights();
+      showToast(res.message || 'LoRA parameter delta packaged and synced to Flower Server!');
+      if (onTriggerRefresh) onTriggerRefresh();
+    } catch (err) {
+      showToast(`Failed to push weights: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -74,17 +172,17 @@ export default function IncidentHub() {
           <div className="flex items-center gap-2.5 mb-2">
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/80 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-              <span>CRITICAL INCIDENT</span>
+              <span>{severity}</span>
             </span>
             <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-              MITRE ATT&CK: T1498
+              MITRE ATT&CK: {activeTechniqueId}
             </span>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-            T1498: Network Denial of Service Flood
+            {incident?.classification || 'T1498: Network Denial of Service Flood'}
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            Target Asset: <span className="font-semibold text-gray-700">Adithyan's MacBook Air (Port 443 / TLS)</span> • Protocol: <span className="font-mono text-gray-700">TCP</span>
+            Target Asset: <span className="font-semibold text-gray-700">{targetAsset}</span> • Protocol: <span className="font-mono text-gray-700">{protocol}</span>
           </p>
         </div>
 
@@ -94,12 +192,13 @@ export default function IncidentHub() {
               SecureBERT Match
             </span>
             <span className="text-3xl font-black text-gray-950 font-sans">
-              96.4%
+              {confidence}%
             </span>
             <span className="text-[11px] font-bold text-rose-600 block">High Confidence</span>
           </div>
+
           <div className="px-3 py-2 rounded-2xl bg-rose-50 border border-rose-200/70 text-rose-700 text-xs font-bold">
-            P1 SEVERITY
+            {severity}
           </div>
         </div>
       </div>
@@ -113,7 +212,7 @@ export default function IncidentHub() {
           </h3>
         </div>
         <div className="bg-gray-50/80 border border-gray-200/70 rounded-2xl p-4 text-xs text-gray-700 leading-relaxed font-sans font-medium">
-          "Detected anomalous TCP network flow targeting destination port 443 on host Adithyan's MacBook Air. The connection lasted 12,000 microseconds transmitting 4,500 forward packets and 10 backward packets, exhibiting irregular volumetric signatures characteristic of a potential high-rate SYN flood resource exhaustion attack."
+          "{narrative}"
         </div>
       </div>
 
@@ -134,34 +233,37 @@ export default function IncidentHub() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {mitreTechniques.map((tech) => (
-            <div
-              key={tech.id}
-              className={`p-3.5 rounded-2xl border transition-all ${
-                tech.active
-                  ? 'bg-rose-50/70 border-rose-300 shadow-xs'
-                  : 'bg-white border-gray-200/70 opacity-75'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-mono font-bold text-gray-500">
-                  {tech.id}
-                </span>
-                {tech.active && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+          {mitreTechniques.map((tech) => {
+            const isActive = activeTechniqueId === tech.id;
+            return (
+              <div
+                key={tech.id}
+                className={`p-3.5 rounded-2xl border transition-all ${
+                  isActive
+                    ? 'bg-rose-50/70 border-rose-300 shadow-xs'
+                    : 'bg-white border-gray-200/70 opacity-75'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-mono font-bold text-gray-500">
+                    {tech.id}
+                  </span>
+                  {isActive && (
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                  )}
+                </div>
+                <h4 className={`text-xs font-bold leading-tight ${isActive ? 'text-rose-900' : 'text-gray-800'}`}>
+                  {tech.name}
+                </h4>
+                <p className="text-[10px] text-gray-400 mt-1 font-medium">{tech.tactic}</p>
+                {isActive && (
+                  <div className="mt-2 pt-2 border-t border-rose-200/60 text-[11px] font-bold text-rose-700 font-mono">
+                    {confidence}% Conf
+                  </div>
                 )}
               </div>
-              <h4 className={`text-xs font-bold leading-tight ${tech.active ? 'text-rose-900' : 'text-gray-800'}`}>
-                {tech.name}
-              </h4>
-              <p className="text-[10px] text-gray-400 mt-1 font-medium">{tech.tactic}</p>
-              {tech.confidence && (
-                <div className="mt-2 pt-2 border-t border-rose-200/60 text-[11px] font-bold text-rose-700 font-mono">
-                  {tech.confidence}% Conf
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -242,44 +344,47 @@ export default function IncidentHub() {
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Real Action Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
           <div className="flex flex-wrap items-center gap-2.5">
             <PillButton
               variant="pastel-pink"
               icon={Ban}
-              onClick={() => showToast("Ingress rule applied: CIDR 192.168.1.0/24 blocked on edge firewall.")}
+              onClick={handleBlockSource}
+              disabled={isProcessing}
             >
               Block Source IP
             </PillButton>
 
             <PillButton
-              variant="outline"
+              variant={isQuarantined ? "pastel-green" : "outline"}
               icon={Server}
-              onClick={() => showToast("Host isolated from corporate VLAN. Management tunnel active.")}
+              onClick={handleQuarantine}
+              disabled={isProcessing}
             >
-              Quarantine Host
+              {isQuarantined ? "Restore Network Access" : "Quarantine Host"}
             </PillButton>
 
             <PillButton
               variant="outline"
               icon={Download}
-              onClick={() => showToast("Compiled and downloaded incident PDF forensic report.")}
+              onClick={handleExportReport}
+              disabled={isProcessing}
             >
-              Export Incident PDF
+              Export Incident Dossier
             </PillButton>
           </div>
 
           <PillButton
             variant="pastel-purple"
             icon={Zap}
-            onClick={() => showToast("Zero-Day LoRA parameters packaged and synced to Flower Server!")}
+            onClick={handlePushWeights}
+            disabled={isProcessing}
           >
-            Push Weights to Colab
+            Push Weights to Federation Hub
           </PillButton>
         </div>
       </div>
     </div>
   );
 }
-

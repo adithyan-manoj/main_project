@@ -51,7 +51,7 @@ export default function ActiveThreatAlertHub({ threatData, onPushWeights }) {
     "Drop incoming traffic originating from anomalous source CIDR block",
     "Rate-limit ingress TCP SYN packets on destination Port 443 via Edge iptables",
     "Trigger priority LoRA parameter upload (ΔW) to Cloud Aggregator",
-    "Isolate edge client MAC-EDGE-01 from internal core banking VLAN"
+    "Isolate edge client MAC-EDGE-01 from internal protected network segment"
   ];
 
   const longTermMitigations = threatData?.llama3_advisory?.long_term_mitigations || [
@@ -224,7 +224,7 @@ export default function ActiveThreatAlertHub({ threatData, onPushWeights }) {
           </button>
 
           <button
-            onClick={() => showToast("Edge host isolated from core VLAN. Management tunnel active.")}
+            onClick={() => showToast("Edge host isolated from network segment. Management tunnel active.")}
             className="flex items-center gap-2 h-9.5 px-4 rounded-xl bg-transparent border border-amber-500/40 hover:border-amber-500 text-amber-400 hover:text-amber-300 text-xs font-semibold transition-all hover:bg-amber-500/10 active:scale-95 cursor-pointer shadow-sm"
           >
             <Server className="w-3.5 h-3.5" />

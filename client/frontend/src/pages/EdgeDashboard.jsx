@@ -154,7 +154,7 @@ export default function EdgeDashboard() {
                 "Drop incoming traffic originating from CIDR block 192.168.1.0/24",
                 "Rate-limit ingress TCP SYN packets on destination Port 443 via Edge iptables",
                 "Trigger priority LoRA parameter upload (ΔW) to Cloud Aggregator",
-                "Isolate edge client MAC-EDGE-01 from internal core banking VLAN"
+                "Isolate edge client MAC-EDGE-01 from internal protected network segment"
               ],
               long_term_mitigations: [
                 "Enforce upstream BGP scrubbing for volumetric edge protection",
