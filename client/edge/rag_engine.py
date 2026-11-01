@@ -155,8 +155,12 @@ class RAGEngine:
             cat_key, cat_name, mitre_id, color = "brute_force", "Brute Force / IAM", "T1110", "#f59e0b"
         elif "Port" in classification or "T1046" in classification:
             cat_key, cat_name, mitre_id, color = "port_scan", "Port Scanning & Recon", "T1046", "#f97316"
-        elif "Web" in classification or "SQL" in classification:
-            cat_key, cat_name, mitre_id, color = "web_attack", "Web / API Injection", "T1059", "#10b981"
+        elif "Web" in classification or "T1190" in classification or "SQL" in classification:
+            cat_key, cat_name, mitre_id, color = "web_attack", "Web / API Injection", "T1190", "#10b981"
+        elif "Scripting" in classification or "T1059" in classification:
+            cat_key, cat_name, mitre_id, color = "web_attack", "Command & Scripting", "T1059", "#10b981"
+        elif "Account" in classification or "Cloud" in classification or "T1098" in classification:
+            cat_key, cat_name, mitre_id, color = "zero_day", "Cloud / Privilege Escalation", "T1098", "#8b5cf6"
 
         new_id = f"live-inc-{int(time.time() * 1000)}"
         narrative = f"Live detection: {classification} targeting {self.node_info['display_name']} on destination port {dst_port} ({protocol}) from {src_ip}. Model confidence: {confidence * 100:.1f}%."

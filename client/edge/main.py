@@ -21,11 +21,16 @@ try:
     from edge.correlator import TemporalCorrelator, EventCorrelator
     from edge.rag_engine import RAGEngine
     from edge.threat_store import ThreatStore
+    from edge.client import classify_threat_narrative
 except ImportError:
     from sensor_manager import SensorManager
     from correlator import TemporalCorrelator, EventCorrelator
     from rag_engine import RAGEngine
     from threat_store import ThreatStore
+    try:
+        from client import classify_threat_narrative
+    except ImportError:
+        classify_threat_narrative = None
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -119,28 +124,82 @@ async def process_telemetry(payload: TelemetryPayload):
 
     # --- STAGE 3: SECUREBERT / FEDERATION INFERENCE ---
     fl_client = None
+    server_addr = os.getenv("FEDTHREAT_SERVER_ADDRESS", "127.0.0.1:8080")
+    inference_engine = "SecureBERT-LoRA-Neural"
+
     if simulate_zero_day:
         logging.warning(f"🚨 ZERO-DAY DETECTED ({severity})! Triggering Federated Learning Correlator...")
-        try:
-            anomaly_data = [{"text": narrative_text, "label": 1}]
+        
+        # Check if central Flower server socket is actively listening (prevents 60s gRPC retry hang)
+        if _check_flower_socket(server_addr):
             try:
-                from edge.client import trigger_federated_round
-            except ImportError:
-                from client import trigger_federated_round
-            server_addr = os.getenv("FEDTHREAT_SERVER_ADDRESS", "127.0.0.1:8080")
-            fl_client = trigger_federated_round(anomaly_data, server_address=server_addr)
-        except Exception as e:
-            logging.info(f"FLoRA Server connection notice: {e}")
+                anomaly_data = [{"text": narrative_text, "label": 1}]
+                try:
+                    from edge.client import trigger_federated_round
+                except ImportError:
+                    from client import trigger_federated_round
+                fl_client = trigger_federated_round(anomaly_data, server_address=server_addr)
+                classification_result = fl_client.dynamic_merge_and_infer(narrative_text)
+                threat_class = classification_result.get("threat_class")
+                confidence = classification_result.get("confidence", 0.96)
+                inference_engine = classification_result.get("engine", "SecureBERT-FLoRA-Merged")
+                logging.info(f"FLoRA round aggregated with {server_addr}: {threat_class} ({confidence:.1%})")
+            except Exception as e:
+                logging.info(f"FLoRA Server connection notice: {e}")
+                fl_client = None
+        else:
+            logging.info(f"[FLoRA Standby] Central Flower Server at {server_addr} is in standby. Running local SecureBERT LoRA inference.")
             fl_client = None
 
+        if fl_client is None:
+            # Run local SecureBERT sequence classification
+            try:
+                if classify_threat_narrative is None:
+                    try:
+                        from edge.client import classify_threat_narrative as _ctn
+                    except ImportError:
+                        from client import classify_threat_narrative as _ctn
+                else:
+                    _ctn = classify_threat_narrative
+                res = _ctn(narrative_text)
+                threat_class = res["threat_class"]
+                confidence = res["confidence"]
+                inference_engine = res.get("engine", "SecureBERT-LoRA-Neural")
+                logging.info(f"SecureBERT Neural Classification: {threat_class} ({confidence:.1%})")
+            except Exception as e:
+                logging.warning(f"[SecureBERT Fallback Activated] Neural model exception ({e}). Using calibrated mapping.")
+                inference_engine = "Calibrated-Fallback"
+                if is_campaign:
+                    threat_class = "T1190: Exploit Public-Facing Application & Account Takeover"
+                elif modality == "auth":
+                    threat_class = "T1110: Brute Force & Credential Stuffing"
+                elif modality == "endpoint":
+                    threat_class = "T1059: Command and Scripting Interpreter"
+                elif modality == "web":
+                    threat_class = "T1190: Exploit Public-Facing Application"
+                elif modality == "cloud":
+                    threat_class = "T1098: Account Manipulation & Cloud Privilege Escalation"
+                else:
+                    threat_class = "T1498: Network Denial of Service"
+                confidence = max(confidence, 0.96)
+    else:
+        logging.warning("🛡️ KNOWN THREAT DETECTED! Bypassing Federation, using fast local SecureBERT inference...")
         try:
-            if fl_client is None:
-                raise Exception("FLoRA Server was offline. Using high-fidelity classification.")
-            classification_result = fl_client.dynamic_merge_and_infer(narrative_text)
-            threat_class = classification_result.get("threat_class", "T1498: Network Denial of Service")
-            confidence = classification_result.get("confidence", 0.96)
-        except Exception:
-            # Domain-calibrated MITRE classification based on multi-sensor findings
+            if classify_threat_narrative is None:
+                try:
+                    from edge.client import classify_threat_narrative as _ctn
+                except ImportError:
+                    from client import classify_threat_narrative as _ctn
+            else:
+                _ctn = classify_threat_narrative
+            res = _ctn(narrative_text)
+            threat_class = res["threat_class"]
+            confidence = res["confidence"]
+            inference_engine = res.get("engine", "SecureBERT-LoRA-Neural")
+            logging.info(f"SecureBERT Neural Classification (Known Threat): {threat_class} ({confidence:.1%})")
+        except Exception as e:
+            logging.warning(f"[SecureBERT Fallback Activated] Neural model exception ({e}). Using calibrated mapping.")
+            inference_engine = "Calibrated-Fallback"
             if is_campaign:
                 threat_class = "T1190: Exploit Public-Facing Application & Account Takeover"
             elif modality == "auth":
@@ -153,18 +212,7 @@ async def process_telemetry(payload: TelemetryPayload):
                 threat_class = "T1098: Account Manipulation & Cloud Privilege Escalation"
             else:
                 threat_class = "T1498: Network Denial of Service"
-            confidence = max(confidence, 0.96)
-    else:
-        logging.warning("🛡️ KNOWN THREAT DETECTED! Bypassing Federation, using fast local inference...")
-        if is_campaign:
-            threat_class = "T1190: Exploit Public-Facing Application & Account Takeover"
-        elif modality == "auth":
-            threat_class = "T1110: Brute Force & Credential Stuffing"
-        elif modality == "cloud":
-            threat_class = "T1098: Account Manipulation"
-        else:
-            threat_class = "T1498: Network Denial of Service"
-        confidence = 0.99
+            confidence = 0.99
 
     # --- STAGE 4: LLAMA-3 RAG ADVISORY ---
     logging.warning(f"🔍 Generating Mitigation Advisory for {threat_class}...")
@@ -216,6 +264,7 @@ async def process_telemetry(payload: TelemetryPayload):
         "narrative_translation": narrative_text,
         "securebert_classification": threat_class,
         "securebert_confidence": confidence,
+        "inference_engine": inference_engine,
         "llama3_advisory": advisory_text,
         "client_node": rag_engine.get_client_node_profile(),
         "message": "Autonomous 4-stage threat analysis and policy formulation complete."

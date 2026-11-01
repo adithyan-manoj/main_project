@@ -119,18 +119,19 @@ class SensorManager:
 
         df_in = pd.DataFrame(row_data)
 
-        # Demo volumetric override
-        if payload.get("Flow_Duration", 0) > 10000 or payload.get("Tot_Fwd_Pkts", 0) > 2000:
+        # Compute real XGBoost prediction
+        try:
+            pred = int(self.network_model.predict(df_in)[0])
+            prob = float(self.network_model.predict_proba(df_in)[0][pred])
+        except Exception as e:
+            logging.warning(f"Network prediction fallback: {e}")
+            pred = 0
+            prob = 0.95
+
+        # Heuristic safeguard: flag volumetric flood signatures if packet volume exceeds threshold
+        if pred == 0 and (payload.get("Flow_Duration", 0) > 10000 or payload.get("Tot_Fwd_Pkts", 0) > 2000):
             pred = 1
             prob = 0.98
-        else:
-            try:
-                pred = int(self.network_model.predict(df_in)[0])
-                prob = float(self.network_model.predict_proba(df_in)[0][pred])
-            except Exception as e:
-                logging.warning(f"Network prediction fallback: {e}")
-                pred = 0
-                prob = 0.95
 
         return pred, prob, {
             "sensor": "network",
